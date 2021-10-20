@@ -5,6 +5,11 @@ metadata:
 spec:
   server_image: r.underland.io/kentik/synsrv:latest
   agent_image: r.underland.io/kentik/ksynth:latest
+  influxdb:
+    endpoint: http://10.106.37.97:8086
+    username: admin
+    password: influxdb
+    token: UXIr_0B_l_ikFD9CEHU2OmuH3HhDemsx_WB6pxZ9lDQ240Cipvu73gMXuottYKO83r-I6hvsFATY2Km2Uv9Vdg==
   fetch:
     - service: demo
       target: /

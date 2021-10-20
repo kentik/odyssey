@@ -54,7 +54,8 @@ const (
 )
 
 var (
-	baseServerConfig = `
+	defaultAgentCommand = []string{"ksynth", "agent", "-vv"}
+	baseServerConfig    = `
 tasks:
   - ping:
       target: 127.0.0.1

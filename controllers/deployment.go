@@ -144,10 +144,15 @@ func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTa
 	}
 	serverEndpoint := fmt.Sprintf("http://%s:%d", serverService.Spec.ClusterIP, serverPort)
 	r.Log.Info("agent deployment", "endpoint", serverEndpoint)
+	cmd := defaultAgentCommand
+	if v := t.Spec.InfluxDB; v != nil {
+		cmd = append(cmd, "--output", fmt.Sprintf("influx=%s,username=%s,password=%s,token=%s", v.Endpoint, v.Username, v.Password, v.Token))
+	}
 	agentContainer := corev1.Container{
 		Image:           image,
 		ImagePullPolicy: corev1.PullAlways,
 		Name:            agentDeploymentContainerName,
+		Command:         cmd,
 		// override api host env var to report to local synsrv
 		Env: []corev1.EnvVar{
 			{

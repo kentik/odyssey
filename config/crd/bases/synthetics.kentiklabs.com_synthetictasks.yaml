@@ -78,6 +78,28 @@ spec:
                   - target
                   type: object
                 type: array
+              influxdb:
+                description: InfluxDB is a remote InfluxDB service to receive agent
+                  metrics
+                properties:
+                  endpoint:
+                    description: Endpoint is the InfluxDB host
+                    type: string
+                  password:
+                    description: Password is the auth password
+                    type: string
+                  token:
+                    description: Token is the auth token
+                    type: string
+                  username:
+                    description: Username is the auth username
+                    type: string
+                required:
+                - endpoint
+                - password
+                - token
+                - username
+                type: object
               server_command:
                 description: ServerCommand is an optional override command for the
                   server

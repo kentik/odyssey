@@ -36,9 +36,27 @@ type SyntheticTaskSpec struct {
 	// AgentCommand is an optional override command for the agent
 	// +optional
 	AgentCommand []string `json:"agent_command,omitempty"`
+	// InfluxDB is a remote InfluxDB service to receive agent metrics
+	// +optional
+	InfluxDB *InfluxDB `json:"influxdb,omitempty"`
 	// Fetch is a list of fetch checks
 	// +optional
 	Fetch []Fetch `json:"fetch,omitempty"`
+}
+
+type InfluxDB struct {
+	// Endpoint is the InfluxDB host
+	// +kubebuilder:validation:Required
+	Endpoint string `json:"endpoint"`
+	// Token is the auth token
+	// +kubebuilder:validation:Required
+	Token string `json:"token"`
+	// Username is the auth username
+	// +kubebuilder:validation:Required
+	Username string `json:"username"`
+	// Password is the auth password
+	// +kubebuilder:validation:Required
+	Password string `json:"password"`
 }
 
 // SyntheticTaskStatus defines the observed state of SyntheticTask
