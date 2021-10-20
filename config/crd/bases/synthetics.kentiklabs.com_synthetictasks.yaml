@@ -36,6 +36,15 @@ spec:
           spec:
             description: SyntheticTaskSpec defines the desired state of SyntheticTask
             properties:
+              agent_command:
+                description: AgentCommand is an optional override command for the
+                  agent
+                items:
+                  type: string
+                type: array
+              agent_image:
+                description: AgentImage is an optional override agent image
+                type: string
               fetch:
                 description: Fetch is a list of fetch checks
                 items:
@@ -50,32 +59,45 @@ spec:
                       description: Period is the interval for which the server to
                         run the check
                       type: string
+                    port:
+                      description: Port is the port to use for the check
+                      type: integer
                     service:
                       description: Service is the name of the service for the check
                       type: string
                     target:
                       description: Target is the target for the check
                       type: string
+                    tls:
+                      description: TLS is a bool to use HTTPS for the check
+                      type: boolean
                   required:
-                  - expiry
                   - method
-                  - period
+                  - port
                   - service
                   - target
                   type: object
                 type: array
-              image:
-                description: Image is the image to use for the server in the deployment
+              server_command:
+                description: ServerCommand is an optional override command for the
+                  server
+                items:
+                  type: string
+                type: array
+              server_image:
+                description: ServerImage is an optional override server image
                 type: string
             type: object
           status:
             description: SyntheticTaskStatus defines the observed state of SyntheticTask
             properties:
-              pods:
-                description: Pods is a list of pods for the deployment
-                items:
-                  type: string
-                type: array
+              deploy_needed:
+                description: DeployNeeded indicates the server needs re-deployed for
+                  changes
+                type: boolean
+              update_id:
+                description: UpdateID is the current updateID for the server
+                type: string
             type: object
         type: object
     served: true

@@ -3,10 +3,12 @@ kind: SyntheticTask
 metadata:
   name: demo
 spec:
-  image: r.underland.io/kentik/synsrv:latest
+  server_image: r.underland.io/kentik/synsrv:latest
+  agent_image: r.underland.io/kentik/ksynth:latest
   fetch:
     - service: demo
       target: /
+      port: 8080
       method: GET
       period: 30s
       expiry: 5s

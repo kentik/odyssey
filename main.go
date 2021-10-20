@@ -71,7 +71,7 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "21e3fc81.kentiklabs.com",
+		LeaderElectionID:       "20e2fc80.kentiklabs.com",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

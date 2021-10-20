@@ -24,17 +24,31 @@ import (
 
 // SyntheticTaskSpec defines the desired state of SyntheticTask
 type SyntheticTaskSpec struct {
-	// Image is the image to use for the server in the deployment
-	Image string `json:"image,omitempty"`
-
+	// ServerImage is an optional override server image
+	// +optional
+	ServerImage string `json:"server_image,omitempty"`
+	// ServerCommand is an optional override command for the server
+	// +optional
+	ServerCommand []string `json:"server_command,omitempty"`
+	// AgentImage is an optional override agent image
+	// +optional
+	AgentImage string `json:"agent_image,omitempty"`
+	// AgentCommand is an optional override command for the agent
+	// +optional
+	AgentCommand []string `json:"agent_command,omitempty"`
 	// Fetch is a list of fetch checks
+	// +optional
 	Fetch []Fetch `json:"fetch,omitempty"`
 }
 
 // SyntheticTaskStatus defines the observed state of SyntheticTask
 type SyntheticTaskStatus struct {
-	// Pods is a list of pods for the deployment
-	Pods []string `json:"pods,omitempty"`
+	// UpdateID is the current updateID for the server
+	// +optional
+	UpdateID string `json:"update_id"`
+	// DeployNeeded indicates the server needs re-deployed for changes
+	// +optional
+	DeployNeeded bool `json:"deploy_needed"`
 }
 
 //+kubebuilder:object:root=true

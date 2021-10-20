@@ -16,15 +16,61 @@ limitations under the License.
 
 package v1
 
+import (
+	"bytes"
+	"fmt"
+	"html/template"
+)
+
+const (
+	fetchYamlTemplate = `
+  - fetch:
+      target: {{.Target}}
+      method: {{.Method}}
+      period: {{.Period}}
+      expiry: {{.Expiry}}
+    ipv4: true
+    ipv6: false
+`
+)
+
 type Fetch struct {
 	// Service is the name of the service for the check
+	// +kubebuilder:validation:Required
 	Service string `json:"service"`
+	// Port is the port to use for the check
+	// +kubebuilder:validation:Required
+	Port int `json:"port"`
+	// TLS is a bool to use HTTPS for the check
+	// +optional
+	TLS bool `json:"tls"`
 	// Target is the target for the check
+	// +kubebuilder:validation:Required
 	Target string `json:"target"`
 	// Method is the http method for the check
+	// +kubebuilder:validation:Required
 	Method string `json:"method"`
 	// Period is the interval for which the server to run the check
+	// +optional
 	Period string `json:"period"`
 	// Expiry is the timeout for the check
+	// +optional
 	Expiry string `json:"expiry"`
+}
+
+func (f *Fetch) Name() string {
+	return fmt.Sprintf("%s-%d-%s", f.Service, f.Port, f.Target)
+}
+
+func (f *Fetch) Yaml() (string, error) {
+	t, err := template.New("fetch").Parse(fetchYamlTemplate)
+	if err != nil {
+		return "", err
+	}
+	buf := bytes.Buffer{}
+	if err := t.Execute(&buf, f); err != nil {
+		return "", err
+	}
+
+	return string(buf.Bytes()), nil
 }
