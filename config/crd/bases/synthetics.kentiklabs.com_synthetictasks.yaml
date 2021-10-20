@@ -1,0 +1,90 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: synthetictasks.synthetics.kentiklabs.com
+spec:
+  group: synthetics.kentiklabs.com
+  names:
+    kind: SyntheticTask
+    listKind: SyntheticTaskList
+    plural: synthetictasks
+    singular: synthetictask
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: SyntheticTask is the Schema for the synthetictasks API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SyntheticTaskSpec defines the desired state of SyntheticTask
+            properties:
+              fetch:
+                description: Fetch is a list of fetch checks
+                items:
+                  properties:
+                    expiry:
+                      description: Expiry is the timeout for the check
+                      type: string
+                    method:
+                      description: Method is the http method for the check
+                      type: string
+                    period:
+                      description: Period is the interval for which the server to
+                        run the check
+                      type: string
+                    service:
+                      description: Service is the name of the service for the check
+                      type: string
+                    target:
+                      description: Target is the target for the check
+                      type: string
+                  required:
+                  - expiry
+                  - method
+                  - period
+                  - service
+                  - target
+                  type: object
+                type: array
+              image:
+                description: Image is the image to use for the server in the deployment
+                type: string
+            type: object
+          status:
+            description: SyntheticTaskStatus defines the observed state of SyntheticTask
+            properties:
+              pods:
+                description: Pods is a list of pods for the deployment
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

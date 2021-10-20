@@ -1,0 +1,7 @@
+apiVersion: synthetics.kentiklabs.com/v1
+kind: SyntheticTask
+metadata:
+  name: synthetictask-sample
+spec:
+  # Add fields here
+  foo: bar
