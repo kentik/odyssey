@@ -50,17 +50,29 @@ spec:
                 items:
                   properties:
                     expiry:
+                      default: 5s
                       description: Expiry is the timeout for the check
                       type: string
                     method:
+                      default: get
                       description: Method is the http method for the check
+                      enum:
+                      - get
+                      - head
+                      - post
+                      - GET
+                      - HEAD
+                      - POST
                       type: string
                     period:
+                      default: 10s
                       description: Period is the interval for which the server to
                         run the check
                       type: string
                     port:
                       description: Port is the port to use for the check
+                      maximum: 65535
+                      minimum: 0
                       type: integer
                     service:
                       description: Service is the name of the service for the check
@@ -114,12 +126,14 @@ spec:
                 items:
                   properties:
                     expiry:
+                      default: 5s
                       description: Expiry is the timeout for the check
                       type: string
                     ingress:
                       description: Ingress is the name of the ingress for the check
                       type: string
                     period:
+                      default: 10s
                       description: Period is the interval for which the server to
                         run the check
                       type: string
@@ -131,6 +145,70 @@ spec:
                       type: integer
                   required:
                   - ingress
+                  type: object
+                type: array
+              trace:
+                description: Trace is a list of Trace checks
+                items:
+                  properties:
+                    count:
+                      default: 3
+                      description: Count is the number of tries to use for the check
+                      maximum: 10
+                      minimum: 1
+                      type: integer
+                    delay:
+                      default: 0ms
+                      description: Delay is the duration to way between checks
+                      pattern: ^[0-9]+ms
+                      type: string
+                    expiry:
+                      default: 5s
+                      description: Expiry is the timeout for the check
+                      type: string
+                    kind:
+                      description: Kind is the k8s object for the check
+                      enum:
+                      - deployment
+                      - pod
+                      - service
+                      - ingress
+                      type: string
+                    limit:
+                      default: 3
+                      description: Limit is the maximum number of hops to use for
+                        the check
+                      maximum: 50
+                      minimum: 1
+                      type: integer
+                    name:
+                      description: Name is the name of the k8s object to check
+                      type: string
+                    period:
+                      default: 10s
+                      description: Period is the interval for which the server to
+                        run the check
+                      type: string
+                    port:
+                      default: 0
+                      description: Port is the port to use for the check
+                      maximum: 65535
+                      minimum: 0
+                      type: integer
+                    protocol:
+                      default: udp
+                      description: Protocol is the protocol to use in the check
+                      enum:
+                      - tcp
+                      - udp
+                      - icmp
+                      - TCP
+                      - UDP
+                      - ICMP
+                      type: string
+                  required:
+                  - kind
+                  - name
                   type: object
                 type: array
             type: object

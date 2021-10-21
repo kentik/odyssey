@@ -39,6 +39,8 @@ type Fetch struct {
 	// +kubebuilder:validation:Required
 	Service string `json:"service"`
 	// Port is the port to use for the check
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=65535
 	// +kubebuilder:validation:Required
 	Port int `json:"port"`
 	// TLS is a bool to use HTTPS for the check
@@ -48,17 +50,21 @@ type Fetch struct {
 	// +kubebuilder:validation:Required
 	Target string `json:"target"`
 	// Method is the http method for the check
+	// +kubebuilder:validation:Enum=get;head;post;GET;HEAD;POST
+	// +kubebuilder:default=`get`
 	// +kubebuilder:validation:Required
 	Method string `json:"method"`
 	// Period is the interval for which the server to run the check
+	// +kubebuilder:default=`10s`
 	// +optional
 	Period string `json:"period"`
 	// Expiry is the timeout for the check
+	// +kubebuilder:default=`5s`
 	// +optional
 	Expiry string `json:"expiry"`
 }
 
-func (f *Fetch) Name() string {
+func (f *Fetch) ID() string {
 	return fmt.Sprintf("%s-%d-%s", f.Service, f.Port, f.Target)
 }
 

@@ -21,3 +21,8 @@ spec:
     - ingress: demo
       period: 30s
       expiry: 5s
+  trace:
+    - kind: deployment
+      name: demo
+      period: 30s
+      expiry: 5s

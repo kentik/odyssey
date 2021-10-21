@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -70,8 +71,8 @@ tasks:
 )
 
 type updateTask interface {
-	// Name returns the name of the task
-	Name() string
+	// ID returns the id of the task
+	ID() string
 	// Yaml returns the task as a yaml config for the server
 	Yaml() (string, error)
 }
@@ -194,7 +195,6 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	updateTasks := []updateTask{}
 	// fetch
 	for _, fetch := range task.Spec.Fetch {
-		log.V(0).Info("adding fetch", "fetch", fmt.Sprintf("%+v", fetch))
 		var svc corev1.Service
 		if err := r.Get(ctx, types.NamespacedName{Name: fetch.Service, Namespace: req.NamespacedName.Namespace}, &svc); err != nil {
 			return ctrl.Result{}, err
@@ -209,21 +209,88 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		// override target with service info
 		fetch.Target = serviceEndpoint
 
+		log.V(0).Info("adding fetch", "fetch", fmt.Sprintf("%+v", fetch))
 		// push the task to the controller list
 		updateTasks = append(updateTasks, &fetch)
 	}
 	// tls handshake
 	for _, tlsHandshake := range task.Spec.TLSHandshake {
-		log.V(0).Info("adding tls handshake", "shake", fmt.Sprintf("%+v", tlsHandshake))
 		var ingress networkingv1.Ingress
 		if err := r.Get(ctx, types.NamespacedName{Name: tlsHandshake.Ingress, Namespace: req.NamespacedName.Namespace}, &ingress); err != nil {
 			return ctrl.Result{}, err
 		}
 		log.Info("building tls handshake configuration for ingress", "ingress", ingress.Name)
+		log.V(0).Info("adding tls handshake", "shake", fmt.Sprintf("%+v", tlsHandshake))
 		for _, rule := range ingress.Spec.Rules {
 			log.Info("adding tls handshake rule", "host", rule.Host)
 			tlsHandshake.Target = rule.Host
 			updateTasks = append(updateTasks, &tlsHandshake)
+		}
+	}
+	// trace
+	for _, trace := range task.Spec.Trace {
+		log.Info("adding trace", "kind", trace.Kind, "name", trace.Name)
+		switch strings.ToLower(trace.Kind) {
+		case "deployment":
+			log.Info("building trace configuration for deployment", "trace", trace.Name)
+			var deploy appsv1.Deployment
+			if err := r.Get(ctx, types.NamespacedName{Name: trace.Name, Namespace: req.NamespacedName.Namespace}, &deploy); err != nil {
+				return ctrl.Result{}, err
+			}
+			// TODO: get list of pods
+			podList := &corev1.PodList{}
+			if err := r.List(ctx, podList, client.InNamespace(task.Namespace), client.MatchingLabels(deploy.Spec.Selector.MatchLabels)); err != nil {
+				return ctrl.Result{}, err
+			}
+			log.Info("adding trace", "deployment", deploy.Name)
+			for _, pod := range podList.Items {
+				log.Info("adding trace", "pod", pod.Name)
+				if pod.Status.PodIP == "" {
+					// wait on pod ip
+					log.Info("waiting on pod ip", "trace", trace.Name, "pod", pod.Name)
+					return ctrl.Result{Requeue: true}, nil
+				}
+				trace.Target = pod.Status.PodIP
+				updateTasks = append(updateTasks, &trace)
+			}
+		case "pod":
+			log.Info("building trace configuration for pod", "trace", trace.Name)
+			var pod corev1.Pod
+			if err := r.Get(ctx, types.NamespacedName{Name: trace.Name, Namespace: req.NamespacedName.Namespace}, &pod); err != nil {
+				return ctrl.Result{}, err
+			}
+			if pod.Status.PodIP == "" {
+				// wait on pod ip
+				log.Info("waiting on pod ip", "trace", trace.Name, "pod", pod.Name)
+				return ctrl.Result{Requeue: true}, nil
+			}
+			log.Info("adding trace", "pod", pod.Name)
+			trace.Target = pod.Status.PodIP
+			updateTasks = append(updateTasks, &trace)
+		case "service":
+			log.Info("building trace configuration for service", "trace", trace.Name)
+			var service corev1.Service
+			if err := r.Get(ctx, types.NamespacedName{Name: trace.Name, Namespace: req.NamespacedName.Namespace}, &service); err != nil {
+				return ctrl.Result{}, err
+			}
+			log.Info("adding trace", "service", service.Name)
+			target := fmt.Sprintf("%s:%d", service.Spec.ClusterIP, trace.Port)
+			trace.Target = target
+			updateTasks = append(updateTasks, &trace)
+		case "ingress":
+			log.Info("building trace configuration for ingress", "trace", trace.Name)
+			var ingress networkingv1.Ingress
+			if err := r.Get(ctx, types.NamespacedName{Name: trace.Name, Namespace: req.NamespacedName.Namespace}, &ingress); err != nil {
+				return ctrl.Result{}, err
+			}
+			log.Info("adding trace", "ingress", ingress.Name)
+			for _, rule := range ingress.Spec.Rules {
+				log.Info("adding trace rule", "host", rule.Host)
+				trace.Target = rule.Host
+				updateTasks = append(updateTasks, &trace)
+			}
+		default:
+			return ctrl.Result{}, fmt.Errorf("invalid trace kind %s", trace.Kind)
 		}
 	}
 
@@ -277,8 +344,6 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	// TODO: cleanup old config maps
-
 	log.Info("update and deployment complete", "task", task.Name)
 	return ctrl.Result{}, nil
 }
@@ -311,12 +376,12 @@ func (r *SyntheticTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func generateUpdateID(tasks []updateTask) string {
 	sort.Slice(tasks, func(i, j int) bool {
-		return tasks[i].Name() > tasks[j].Name()
+		return tasks[i].ID() > tasks[j].ID()
 	})
 
 	h := sha1.New()
 	for _, task := range tasks {
-		h.Write([]byte(task.Name()))
+		h.Write([]byte(task.ID()))
 	}
 
 	return hex.EncodeToString(h.Sum(nil))

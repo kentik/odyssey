@@ -45,6 +45,9 @@ type SyntheticTaskSpec struct {
 	// TLSHandshake is a list of TLS Handshake checks
 	// +optional
 	TLSHandshake []TLSHandshake `json:"tls_handshake,omitempty"`
+	// Trace is a list of Trace checks
+	// +optional
+	Trace []Trace `json:"trace,omitempty"`
 }
 
 type InfluxDB struct {

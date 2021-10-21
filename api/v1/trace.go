@@ -23,31 +23,61 @@ import (
 )
 
 const (
-	tlsHandshakeYamlTemplate = `
-  - shake:
+	traceYamlTemplate = `
+  - trace:
       target: {{.Target}}
+      protocol: {{.Protocol}}
       port: {{.Port}}
+      count: {{.Count}}
+      limit: {{.Limit}}
       period: {{.Period}}
+      delay: {{.Delay}}
       expiry: {{.Expiry}}
     ipv4: true
     ipv6: false
 `
 )
 
-type TLSHandshake struct {
-	// Ingress is the name of the ingress for the check
+type Trace struct {
+	// Kind is the k8s object for the check
 	// +kubebuilder:validation:Required
-	Ingress string `json:"ingress"`
+	// +kubebuilder:validation:Enum=deployment;pod;service;ingress
+	Kind string `json:"kind"`
+	// Name is the name of the k8s object to check
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+	// Protocol is the protocol to use in the check
+	// +kubebuilder:validation:Enum=tcp;udp;icmp;TCP;UDP;ICMP
+	// +kubebuilder:default=udp
+	// +optional
+	Protocol string `json:"protocol"`
 	// Port is the port to use for the check
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=65535
-	// +kubebuilder:default=443
+	// +kubebuilder:default=0
 	// +optional
 	Port int `json:"port"`
+	// Count is the number of tries to use for the check
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=10
+	// +kubebuilder:default=3
+	// +optional
+	Count int `json:"count"`
+	// Limit is the maximum number of hops to use for the check
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=50
+	// +kubebuilder:default=3
+	// +optional
+	Limit int `json:"limit"`
 	// Period is the interval for which the server to run the check
 	// +kubebuilder:default=`10s`
 	// +optional
 	Period string `json:"period"`
+	// Delay is the duration to way between checks
+	// +kubebuilder:validation:Pattern=`^[0-9]+ms`
+	// +kubebuilder:default=`0ms`
+	// +optional
+	Delay string `json:"delay"`
 	// Expiry is the timeout for the check
 	// +kubebuilder:default=`5s`
 	// +optional
@@ -58,12 +88,12 @@ type TLSHandshake struct {
 	Target string `json:"-"`
 }
 
-func (t *TLSHandshake) ID() string {
-	return fmt.Sprintf("%s-%d", t.Ingress, t.Port)
+func (t *Trace) ID() string {
+	return fmt.Sprintf("%s-%s-%d", t.Kind, t.Name, t.Port)
 }
 
-func (t *TLSHandshake) Yaml() (string, error) {
-	tmpl, err := template.New("tlsHandshake").Parse(tlsHandshakeYamlTemplate)
+func (t *Trace) Yaml() (string, error) {
+	tmpl, err := template.New("trace").Parse(traceYamlTemplate)
 	if err != nil {
 		return "", err
 	}
