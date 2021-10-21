@@ -23,10 +23,10 @@ import (
 )
 
 const (
-	fetchYamlTemplate = `
-  - fetch:
+	tlsHandshakeYamlTemplate = `
+  - shake:
       target: {{.Target}}
-      method: {{.Method}}
+      port: {{.Port}}
       period: {{.Period}}
       expiry: {{.Expiry}}
     ipv4: true
@@ -34,41 +34,39 @@ const (
 `
 )
 
-type Fetch struct {
-	// Service is the name of the service for the check
+type TLSHandshake struct {
+	// Ingress is the name of the ingress for the check
 	// +kubebuilder:validation:Required
-	Service string `json:"service"`
+	Ingress string `json:"ingress"`
 	// Port is the port to use for the check
-	// +kubebuilder:validation:Required
-	Port int `json:"port"`
-	// TLS is a bool to use HTTPS for the check
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:default=443
 	// +optional
-	TLS bool `json:"tls"`
-	// Target is the target for the check
-	// +kubebuilder:validation:Required
-	Target string `json:"target"`
-	// Method is the http method for the check
-	// +kubebuilder:validation:Required
-	Method string `json:"method"`
+	Port int `json:"port"`
 	// Period is the interval for which the server to run the check
 	// +optional
 	Period string `json:"period"`
 	// Expiry is the timeout for the check
 	// +optional
 	Expiry string `json:"expiry"`
+
+	// Target is used in the yaml definition but not exposed to the user
+	// +optional
+	Target string `json:"-"`
 }
 
-func (f *Fetch) Name() string {
-	return fmt.Sprintf("%s-%d-%s", f.Service, f.Port, f.Target)
+func (t *TLSHandshake) Name() string {
+	return fmt.Sprintf("%s-%d", t.Ingress, t.Port)
 }
 
-func (f *Fetch) Yaml() (string, error) {
-	t, err := template.New("fetch").Parse(fetchYamlTemplate)
+func (t *TLSHandshake) Yaml() (string, error) {
+	tmpl, err := template.New("tlsHandshake").Parse(tlsHandshakeYamlTemplate)
 	if err != nil {
 		return "", err
 	}
 	buf := bytes.Buffer{}
-	if err := t.Execute(&buf, f); err != nil {
+	if err := tmpl.Execute(&buf, t); err != nil {
 		return "", err
 	}
 

@@ -42,6 +42,9 @@ type SyntheticTaskSpec struct {
 	// Fetch is a list of fetch checks
 	// +optional
 	Fetch []Fetch `json:"fetch,omitempty"`
+	// TLSHandshake is a list of TLS Handshake checks
+	// +optional
+	TLSHandshake []TLSHandshake `json:"tls_handshake,omitempty"`
 }
 
 type InfluxDB struct {

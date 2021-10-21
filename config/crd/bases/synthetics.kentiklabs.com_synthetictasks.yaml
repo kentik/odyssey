@@ -109,6 +109,30 @@ spec:
               server_image:
                 description: ServerImage is an optional override server image
                 type: string
+              tls_handshake:
+                description: TLSHandshake is a list of TLS Handshake checks
+                items:
+                  properties:
+                    expiry:
+                      description: Expiry is the timeout for the check
+                      type: string
+                    ingress:
+                      description: Ingress is the name of the ingress for the check
+                      type: string
+                    period:
+                      description: Period is the interval for which the server to
+                        run the check
+                      type: string
+                    port:
+                      default: 443
+                      description: Port is the port to use for the check
+                      maximum: 65535
+                      minimum: 0
+                      type: integer
+                  required:
+                  - ingress
+                  type: object
+                type: array
             type: object
           status:
             description: SyntheticTaskStatus defines the observed state of SyntheticTask

@@ -25,6 +25,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -191,6 +192,7 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// build and update config for server
 	log.Info("checking tasks")
 	updateTasks := []updateTask{}
+	// fetch
 	for _, fetch := range task.Spec.Fetch {
 		log.V(0).Info("adding fetch", "fetch", fmt.Sprintf("%+v", fetch))
 		var svc corev1.Service
@@ -209,6 +211,20 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		// push the task to the controller list
 		updateTasks = append(updateTasks, &fetch)
+	}
+	// tls handshake
+	for _, tlsHandshake := range task.Spec.TLSHandshake {
+		log.V(0).Info("adding tls handshake", "shake", fmt.Sprintf("%+v", tlsHandshake))
+		var ingress networkingv1.Ingress
+		if err := r.Get(ctx, types.NamespacedName{Name: tlsHandshake.Ingress, Namespace: req.NamespacedName.Namespace}, &ingress); err != nil {
+			return ctrl.Result{}, err
+		}
+		log.Info("building tls handshake configuration for ingress", "ingress", ingress.Name)
+		for _, rule := range ingress.Spec.Rules {
+			log.Info("adding tls handshake rule", "host", rule.Host)
+			tlsHandshake.Target = rule.Host
+			updateTasks = append(updateTasks, &tlsHandshake)
+		}
 	}
 
 	updateID := generateUpdateID(updateTasks)

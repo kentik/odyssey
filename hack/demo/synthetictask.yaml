@@ -17,3 +17,7 @@ spec:
       method: GET
       period: 30s
       expiry: 5s
+  tls_handshake:
+    - ingress: demo
+      period: 30s
+      expiry: 5s
