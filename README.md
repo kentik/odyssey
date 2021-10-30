@@ -81,7 +81,6 @@ info (IP, etc) will be automatically resolved by the operator.
 | `method` | optional (default: `GET`) | HTTP method to use for check |
 | `period` | optional (default: `10s`) | Interval to perform check |
 | `expiry` | optional (default: `5s`) | Timeout for the check to complete|
-|----------|----------|----------|
 
 ## TLS Handshake
 The `tls_handshake` test performs a TLS handshake and reports info. This check requires
