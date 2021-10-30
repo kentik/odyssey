@@ -88,21 +88,18 @@ info (IP, etc) will be automatically resolved by the operator.
 The `tls_handshake` test performs a TLS handshake and reports info. This check requires
 a Kubernetes Ingress object. The connection info will be automatically resolved by the operator.
 
-|----------|----------|----------|
 |Name      |Required  | Description|
 |----------|----------|----------|
 | `ingress` | yes | Name of the Kubernetes ingress|
 | `port` | optional (default: `443`) | Port to check|
 | `period` | optional (default: `10s`) | Interval to perform check |
 | `expiry` | optional (default: `5s`) | Timeout for the check to complete|
-|----------|----------|----------|
 
 ## Ping
 Ping performs a network ping and latency, etc. This check can be used
 with a Kubernetes `Pod`, `Deployment`, `Service`, or `Ingress`. The connection info
 will be automatically resolved by the operator.
 
-|----------|----------|----------|
 |Name      |Required  | Description|
 |----------|----------|----------|
 | `kind` | yes | Kubernetes object to check (`Deployment`, `Pod`, `Service`, `Ingress`)|
@@ -111,14 +108,12 @@ will be automatically resolved by the operator.
 | `period` | optional (default: `10s`) | Interval to perform check |
 | `delay` | optional (default: `0ms`) | Delay (in ms) before each check|
 | `expiry` | optional (default: `5s`) | Timeout for the check to complete|
-|----------|----------|----------|
 
 ## Trace
 Trace performs a network trace and reports hops, latency, etc. This check can be used
 with a Kubernetes `Pod`, `Deployment`, `Service`, or `Ingress`. The connection info
 will be automatically resolved by the operator.
 
-|----------|----------|----------|
 |Name      |Required  | Description|
 |----------|----------|----------|
 | `kind` | yes | Kubernetes object to check (`Deployment`, `Pod`, `Service`, `Ingress`)|
@@ -130,7 +125,6 @@ will be automatically resolved by the operator.
 | `period` | optional (default: `10s`) | Interval to perform check |
 | `delay` | optional (default: `0ms`) | Delay (in ms) before each check|
 | `expiry` | optional (default: `5s`) | Timeout for the check to complete|
-|----------|----------|----------|
 
 # InfluxDB
 By default the agent will report the results to `stdout` of the container. To have them
@@ -151,7 +145,6 @@ spec:
     bucket: "default"
 ```
 
-|----------|----------|----------|
 |Name      |Required  | Description|
 |----------|----------|----------|
 | Endpoint | yes | InfluxDB endpoint. Must include the `/api/<version>/` to determine version.|
@@ -160,4 +153,3 @@ spec:
 | Token | yes if no username/password | InfluxDB authentication token |
 | Organization | yes | InfluxDB organization to send data|
 | Bucket | yes | InfluxDB bucket to send data|
-|----------|----------|----------|
