@@ -72,7 +72,6 @@ The following tasks are supported.
 Fetch performs an HTTP operation on the specified Kubernetes service. The connection
 info (IP, etc) will be automatically resolved by the operator.
 
-|----------|----------|----------|
 |Name      |Required  | Description|
 |----------|----------|----------|
 | `service` | yes | Name of the Kubernetes service|
