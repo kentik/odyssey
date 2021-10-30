@@ -24,6 +24,16 @@ import (
 
 // SyntheticTaskSpec defines the desired state of SyntheticTask
 type SyntheticTaskSpec struct {
+	// KentikCompany is the company ID to send data to Kentik
+	// +optional
+	KentikCompany string `json:"kentik_company"`
+	// KentikSite is the site ID to send data to Kentik
+	// +optional
+	KentikSite string `json:"kentik_site"`
+	// KentikRegion is the region to configure for sending data to Kentik
+	// +optional
+	// +kubebuilder:validation:Enum=us;eu;US;EU
+	KentikRegion string `json:"kentik_region"`
 	// ServerImage is an optional override server image
 	// +optional
 	ServerImage string `json:"server_image,omitempty"`
@@ -48,6 +58,9 @@ type SyntheticTaskSpec struct {
 	// Trace is a list of Trace checks
 	// +optional
 	Trace []Trace `json:"trace,omitempty"`
+	// Ping is a list of Ping checks
+	// +optional
+	Ping []Ping `json:"ping,omitempty"`
 }
 
 type InfluxDB struct {
@@ -55,14 +68,20 @@ type InfluxDB struct {
 	// +kubebuilder:validation:Required
 	Endpoint string `json:"endpoint"`
 	// Token is the auth token
-	// +kubebuilder:validation:Required
+	// +optional
 	Token string `json:"token"`
 	// Username is the auth username
-	// +kubebuilder:validation:Required
+	// +optional
 	Username string `json:"username"`
 	// Password is the auth password
-	// +kubebuilder:validation:Required
+	// +optional
 	Password string `json:"password"`
+	// Organization is the InfluxDB organization
+	// +kubebuilder:validation:Required
+	Organization string `json:"organization"`
+	// Bucket is the InfluxDB bucket
+	// +kubebuilder:validation:Required
+	Bucket string `json:"bucket"`
 }
 
 // SyntheticTaskStatus defines the observed state of SyntheticTask

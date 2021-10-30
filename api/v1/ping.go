@@ -23,13 +23,10 @@ import (
 )
 
 const (
-	traceYamlTemplate = `
-  - trace:
+	pingYamlTemplate = `
+  - ping:
       target: {{.Target}}
-      protocol: {{.Protocol}}
-      port: {{.Port}}
       count: {{.Count}}
-      limit: {{.Limit}}
       period: {{.Period}}
       delay: {{.Delay}}
       expiry: {{.Expiry}}
@@ -38,7 +35,7 @@ const (
 `
 )
 
-type Trace struct {
+type Ping struct {
 	// Kind is the k8s object for the check
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum=deployment;pod;service;ingress
@@ -46,29 +43,12 @@ type Trace struct {
 	// Name is the name of the k8s object to check
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
-	// Protocol is the protocol to use in the check
-	// +kubebuilder:validation:Enum=tcp;udp;icmp;TCP;UDP;ICMP
-	// +kubebuilder:default=udp
-	// +optional
-	Protocol string `json:"protocol"`
-	// Port is the port to use for the check
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=65535
-	// +kubebuilder:default=0
-	// +optional
-	Port int `json:"port"`
 	// Count is the number of tries to use for the check
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=10
 	// +kubebuilder:default=3
 	// +optional
 	Count int `json:"count"`
-	// Limit is the maximum number of hops to use for the check
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=50
-	// +kubebuilder:default=3
-	// +optional
-	Limit int `json:"limit"`
 	// Period is the interval for which the server to run the check
 	// +kubebuilder:default=`10s`
 	// +optional
@@ -79,7 +59,7 @@ type Trace struct {
 	// +optional
 	Delay string `json:"delay"`
 	// Expiry is the timeout for the check
-	// +kubebuilder:default=`5s`
+	// +kubebuilder:default=`2s`
 	// +optional
 	Expiry string `json:"expiry"`
 
@@ -88,17 +68,17 @@ type Trace struct {
 	Target string `json:"-"`
 }
 
-func (t *Trace) ID() string {
-	return fmt.Sprintf("%s-%s-%d", t.Kind, t.Name, t.Port)
+func (p *Ping) ID() string {
+	return fmt.Sprintf("%s-%s-%d", p.Kind, p.Name, p.Count)
 }
 
-func (t *Trace) Yaml() (string, error) {
-	tmpl, err := template.New("trace").Parse(traceYamlTemplate)
+func (p *Ping) Yaml() (string, error) {
+	tmpl, err := template.New("ping").Parse(pingYamlTemplate)
 	if err != nil {
 		return "", err
 	}
 	buf := bytes.Buffer{}
-	if err := tmpl.Execute(&buf, t); err != nil {
+	if err := tmpl.Execute(&buf, p); err != nil {
 		return "", err
 	}
 

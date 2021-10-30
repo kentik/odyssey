@@ -1,6 +1,0 @@
-apiVersion: synthetics.kentiklabs.com/v1
-kind: SyntheticTask
-metadata:
-  name: synthetictask-default
-spec:
-  image: r.underland.io/kentik/synsrv:latest

@@ -21,14 +21,12 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
-	"sort"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -53,6 +51,10 @@ const (
 	serverConfigMapName              = "server-config.yml"
 	agentDeploymentContainerName     = "synthetics-agent"
 	agentApiHostEnvVar               = "KENTIK_API_HOST"
+	agentKentikCompanyEnvVar         = "KENTIK_COMPANY"
+	agentKentikSiteEnvVar            = "KENTIK_SITE"
+	agentKentikRegionEnvVar          = "KENTIK_REGION"
+	agentKentikAgentUpdateEnvVar     = "AGENT_UPDATE"
 )
 
 var (
@@ -192,7 +194,7 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// build and update config for server
 	log.Info("checking tasks")
-	updateTasks := []updateTask{}
+	configData := "tasks:"
 	// fetch
 	for _, fetch := range task.Spec.Fetch {
 		var svc corev1.Service
@@ -210,8 +212,11 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		fetch.Target = serviceEndpoint
 
 		log.V(0).Info("adding fetch", "fetch", fmt.Sprintf("%+v", fetch))
-		// push the task to the controller list
-		updateTasks = append(updateTasks, &fetch)
+		yml, err := fetch.Yaml()
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		configData += yml
 	}
 	// tls handshake
 	for _, tlsHandshake := range task.Spec.TLSHandshake {
@@ -224,9 +229,99 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		for _, rule := range ingress.Spec.Rules {
 			log.Info("adding tls handshake rule", "host", rule.Host)
 			tlsHandshake.Target = rule.Host
-			updateTasks = append(updateTasks, &tlsHandshake)
+			yml, err := tlsHandshake.Yaml()
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			configData += yml
 		}
 	}
+	// ping
+	for _, ping := range task.Spec.Ping {
+		log.Info("adding ping", "kind", ping.Kind, "name", ping.Name)
+		switch strings.ToLower(ping.Kind) {
+		case "deployment":
+			log.Info("building ping configuration for deployment", "ping", ping.Name)
+			var deploy appsv1.Deployment
+			if err := r.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &deploy); err != nil {
+				return ctrl.Result{}, err
+			}
+			podList := &corev1.PodList{}
+			if err := r.List(ctx, podList, client.InNamespace(task.Namespace), client.MatchingLabels(deploy.Spec.Selector.MatchLabels)); err != nil {
+				return ctrl.Result{}, err
+			}
+			log.Info("adding ping", "deployment", deploy.Name)
+			existingPods := map[string]struct{}{}
+			for _, pod := range podList.Items {
+				log.Info("adding ping", "pod", pod.Name)
+				if pod.Status.PodIP == "" {
+					// wait on pod ip
+					log.Info("waiting on pod ip", "ping", ping.Name, "pod", pod.Name)
+					return ctrl.Result{Requeue: true}, nil
+				}
+				if _, exists := existingPods[pod.Status.PodIP]; exists {
+					log.Info("skipping existing pod", "pod", pod.Name)
+					continue
+				}
+				ping.Target = pod.Status.PodIP
+				yml, err := ping.Yaml()
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+				configData += yml
+			}
+		case "pod":
+			log.Info("building ping configuration for pod", "ping", ping.Name)
+			var pod corev1.Pod
+			if err := r.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &pod); err != nil {
+				return ctrl.Result{}, err
+			}
+			if pod.Status.PodIP == "" {
+				// wait on pod ip
+				log.Info("waiting on pod ip", "ping", ping.Name, "pod", pod.Name)
+				return ctrl.Result{Requeue: true}, nil
+			}
+			log.Info("adding ping", "pod", pod.Name)
+			ping.Target = pod.Status.PodIP
+			yml, err := ping.Yaml()
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			configData += yml
+		case "service":
+			log.Info("building ping configuration for service", "ping", ping.Name)
+			var service corev1.Service
+			if err := r.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &service); err != nil {
+				return ctrl.Result{}, err
+			}
+			log.Info("adding ping", "service", service.Name)
+			ping.Target = service.Spec.ClusterIP
+			yml, err := ping.Yaml()
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			configData += yml
+		case "ingress":
+			log.Info("building ping configuration for ingress", "ping", ping.Name)
+			var ingress networkingv1.Ingress
+			if err := r.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &ingress); err != nil {
+				return ctrl.Result{}, err
+			}
+			log.Info("adding ping", "ingress", ingress.Name)
+			for _, rule := range ingress.Spec.Rules {
+				log.Info("adding ping rule", "host", rule.Host)
+				ping.Target = rule.Host
+				yml, err := ping.Yaml()
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+				configData += yml
+			}
+		default:
+			return ctrl.Result{}, fmt.Errorf("invalid ping kind %s", ping.Kind)
+		}
+	}
+
 	// trace
 	for _, trace := range task.Spec.Trace {
 		log.Info("adding trace", "kind", trace.Kind, "name", trace.Name)
@@ -237,12 +332,12 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			if err := r.Get(ctx, types.NamespacedName{Name: trace.Name, Namespace: req.NamespacedName.Namespace}, &deploy); err != nil {
 				return ctrl.Result{}, err
 			}
-			// TODO: get list of pods
 			podList := &corev1.PodList{}
 			if err := r.List(ctx, podList, client.InNamespace(task.Namespace), client.MatchingLabels(deploy.Spec.Selector.MatchLabels)); err != nil {
 				return ctrl.Result{}, err
 			}
 			log.Info("adding trace", "deployment", deploy.Name)
+			existingPods := map[string]struct{}{}
 			for _, pod := range podList.Items {
 				log.Info("adding trace", "pod", pod.Name)
 				if pod.Status.PodIP == "" {
@@ -250,8 +345,16 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 					log.Info("waiting on pod ip", "trace", trace.Name, "pod", pod.Name)
 					return ctrl.Result{Requeue: true}, nil
 				}
+				if _, exists := existingPods[pod.Status.PodIP]; exists {
+					log.Info("skipping existing pod", "pod", pod.Name)
+					continue
+				}
 				trace.Target = pod.Status.PodIP
-				updateTasks = append(updateTasks, &trace)
+				yml, err := trace.Yaml()
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+				configData += yml
 			}
 		case "pod":
 			log.Info("building trace configuration for pod", "trace", trace.Name)
@@ -266,7 +369,11 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			}
 			log.Info("adding trace", "pod", pod.Name)
 			trace.Target = pod.Status.PodIP
-			updateTasks = append(updateTasks, &trace)
+			yml, err := trace.Yaml()
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			configData += yml
 		case "service":
 			log.Info("building trace configuration for service", "trace", trace.Name)
 			var service corev1.Service
@@ -276,7 +383,11 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			log.Info("adding trace", "service", service.Name)
 			target := fmt.Sprintf("%s:%d", service.Spec.ClusterIP, trace.Port)
 			trace.Target = target
-			updateTasks = append(updateTasks, &trace)
+			yml, err := trace.Yaml()
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			configData += yml
 		case "ingress":
 			log.Info("building trace configuration for ingress", "trace", trace.Name)
 			var ingress networkingv1.Ingress
@@ -287,14 +398,19 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			for _, rule := range ingress.Spec.Rules {
 				log.Info("adding trace rule", "host", rule.Host)
 				trace.Target = rule.Host
-				updateTasks = append(updateTasks, &trace)
+				yml, err := trace.Yaml()
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+				configData += yml
 			}
 		default:
 			return ctrl.Result{}, fmt.Errorf("invalid trace kind %s", trace.Kind)
 		}
 	}
 
-	updateID := generateUpdateID(updateTasks)
+	//updateID := generateUpdateID(updateTasks)
+	updateID := generateUpdateID(configData)
 	log.Info("checking update", "updateID", updateID, "current", task.Status.UpdateID)
 
 	if task.Status.UpdateID != updateID {
@@ -302,15 +418,7 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		task.Status.UpdateID = updateID
 		task.Status.DeployNeeded = true
 
-		configData := "tasks:"
-		for _, t := range updateTasks {
-			yml, err := t.Yaml()
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			configData += yml
-		}
-
+		log.Info("config update", "config", configData)
 		currentServerConfigMap.Data[serverConfigMapName] = configData
 		if err := r.Update(ctx, &currentServerConfigMap); err != nil {
 			return ctrl.Result{}, err
@@ -348,41 +456,8 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *SyntheticTaskReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.tasks = map[string]interface{}{}
-	r.updateCh = make(chan *updateConfig)
-
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &syntheticsv1.SyntheticTask{}, ownerKey, func(rawObj client.Object) []string {
-		task := rawObj.(*syntheticsv1.SyntheticTask)
-		owner := metav1.GetControllerOf(task)
-		if owner == nil {
-			return nil
-		}
-		if owner.APIVersion != syntheticsv1.GroupVersion.String() || owner.Kind != "SyntheticTask" {
-			return nil
-		}
-		return []string{owner.Name}
-	}); err != nil {
-		return err
-	}
-
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&syntheticsv1.SyntheticTask{}).
-		Owns(&appsv1.Deployment{}).
-		Owns(&corev1.ConfigMap{}).
-		Complete(r)
-}
-
-func generateUpdateID(tasks []updateTask) string {
-	sort.Slice(tasks, func(i, j int) bool {
-		return tasks[i].ID() > tasks[j].ID()
-	})
-
+func generateUpdateID(configData string) string {
 	h := sha1.New()
-	for _, task := range tasks {
-		h.Write([]byte(task.ID()))
-	}
-
+	h.Write([]byte(configData))
 	return hex.EncodeToString(h.Sum(nil))
 }

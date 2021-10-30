@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"fmt"
+	"strings"
 
 	syntheticsv1 "github.com/kentik/odyssey/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -142,24 +143,58 @@ func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTa
 	if image == "" {
 		image = defaultSyntheticAgentImage
 	}
-	serverEndpoint := fmt.Sprintf("http://%s:%d", serverService.Spec.ClusterIP, serverPort)
-	r.Log.Info("agent deployment", "endpoint", serverEndpoint)
 	cmd := defaultAgentCommand
-	if v := t.Spec.InfluxDB; v != nil {
-		cmd = append(cmd, "--output", fmt.Sprintf("influx=%s,username=%s,password=%s,token=%s", v.Endpoint, v.Username, v.Password, v.Token))
+	serverEndpoint := ""
+	if t.Spec.KentikCompany != "" {
+		tld := "com"
+		if strings.ToLower(t.Spec.KentikRegion) == "eu" {
+			tld = "eu"
+		}
+		serverEndpoint = fmt.Sprintf("https://api.kentik.%s", tld)
+	} else {
+		serverEndpoint = fmt.Sprintf("http://%s:%d", serverService.Spec.ClusterIP, serverPort)
+		r.Log.Info("configuring for local export", "endpoint", serverEndpoint)
+		if v := t.Spec.InfluxDB; v != nil {
+			influxEndpoint := fmt.Sprintf("%s?org=%s&bucket=%s", v.Endpoint, v.Organization, v.Bucket)
+			r.Log.Info("configuring influxdb output", "target", influxEndpoint)
+			cmd = append(cmd, "--output", fmt.Sprintf("influx=%s,username=%s,password=%s,token=%s", influxEndpoint, v.Username, v.Password, v.Token))
+		}
+	}
+	r.Log.Info("agent deployment")
+	env := []corev1.EnvVar{
+		{
+			Name:  agentApiHostEnvVar,
+			Value: serverEndpoint,
+		},
+		{
+			Name:  agentKentikAgentUpdateEnvVar,
+			Value: "false",
+		},
+	}
+	if v := t.Spec.KentikCompany; v != "" {
+		env = append(env, corev1.EnvVar{
+			Name:  agentKentikCompanyEnvVar,
+			Value: v,
+		})
+	}
+	if v := t.Spec.KentikSite; v != "" {
+		env = append(env, corev1.EnvVar{
+			Name:  agentKentikSiteEnvVar,
+			Value: v,
+		})
+	}
+	if v := t.Spec.KentikRegion; v != "" {
+		env = append(env, corev1.EnvVar{
+			Name:  agentKentikRegionEnvVar,
+			Value: v,
+		})
 	}
 	agentContainer := corev1.Container{
 		Image:           image,
 		ImagePullPolicy: corev1.PullAlways,
 		Name:            agentDeploymentContainerName,
 		Command:         cmd,
-		// override api host env var to report to local synsrv
-		Env: []corev1.EnvVar{
-			{
-				Name:  agentApiHostEnvVar,
-				Value: serverEndpoint,
-			},
-		},
+		Env:             env,
 	}
 	if len(t.Spec.AgentCommand) > 0 {
 		agentContainer.Command = t.Spec.AgentCommand

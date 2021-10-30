@@ -5,22 +5,43 @@ metadata:
 spec:
   server_image: r.underland.io/kentik/synsrv:latest
   agent_image: r.underland.io/kentik/ksynth:latest
+  #kentik_company: "116465"
+  #kentik_site: "10445"
   influxdb:
-    endpoint: http://10.106.37.97:8086
-    username: admin
-    password: influxdb
-    token: UXIr_0B_l_ikFD9CEHU2OmuH3HhDemsx_WB6pxZ9lDQ240Cipvu73gMXuottYKO83r-I6hvsFATY2Km2Uv9Vdg==
+    endpoint: "http://influx:8086/api/v2/write"
+    organization: "system"
+    bucket: "default"
+    token: "secret-token"
+  ping:
+    - kind: service
+      name: demo
+      period: 10s
+      count: 3
+      delay: 0ms
+      expiry: 2s
+    - kind: service
+      name: demo-new
+      period: 10s
+      count: 3
+      delay: 0ms
+      expiry: 2s
   fetch:
     - service: demo
       target: /
       port: 8080
       method: GET
-      period: 30s
+      period: 10s
       expiry: 5s
-  tls_handshake:
-    - ingress: demo
-      period: 30s
+    - service: demo-new
+      target: /
+      port: 8080
+      method: GET
+      period: 10s
       expiry: 5s
+  #tls_handshake:
+  #  - ingress: demo
+  #    period: 30s
+  #    expiry: 5s
   trace:
     - kind: deployment
       name: demo

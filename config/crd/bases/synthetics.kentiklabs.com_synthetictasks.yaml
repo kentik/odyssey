@@ -94,8 +94,14 @@ spec:
                 description: InfluxDB is a remote InfluxDB service to receive agent
                   metrics
                 properties:
+                  bucket:
+                    description: Bucket is the InfluxDB bucket
+                    type: string
                   endpoint:
                     description: Endpoint is the InfluxDB host
+                    type: string
+                  organization:
+                    description: Organization is the InfluxDB organization
                     type: string
                   password:
                     description: Password is the auth password
@@ -107,11 +113,65 @@ spec:
                     description: Username is the auth username
                     type: string
                 required:
+                - bucket
                 - endpoint
-                - password
-                - token
-                - username
+                - organization
                 type: object
+              kentik_company:
+                description: KentikCompany is the company ID to send data to Kentik
+                type: string
+              kentik_region:
+                description: KentikRegion is the region to configure for sending data
+                  to Kentik
+                enum:
+                - us
+                - eu
+                - US
+                - EU
+                type: string
+              kentik_site:
+                description: KentikSite is the site ID to send data to Kentik
+                type: string
+              ping:
+                description: Ping is a list of Ping checks
+                items:
+                  properties:
+                    count:
+                      default: 3
+                      description: Count is the number of tries to use for the check
+                      maximum: 10
+                      minimum: 1
+                      type: integer
+                    delay:
+                      default: 0ms
+                      description: Delay is the duration to wait between checks
+                      pattern: ^[0-9]+ms
+                      type: string
+                    expiry:
+                      default: 2s
+                      description: Expiry is the timeout for the check
+                      type: string
+                    kind:
+                      description: Kind is the k8s object for the check
+                      enum:
+                      - deployment
+                      - pod
+                      - service
+                      - ingress
+                      type: string
+                    name:
+                      description: Name is the name of the k8s object to check
+                      type: string
+                    period:
+                      default: 10s
+                      description: Period is the interval for which the server to
+                        run the check
+                      type: string
+                  required:
+                  - kind
+                  - name
+                  type: object
+                type: array
               server_command:
                 description: ServerCommand is an optional override command for the
                   server
@@ -159,7 +219,7 @@ spec:
                       type: integer
                     delay:
                       default: 0ms
-                      description: Delay is the duration to way between checks
+                      description: Delay is the duration to wait between checks
                       pattern: ^[0-9]+ms
                       type: string
                     expiry:
