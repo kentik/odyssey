@@ -62,7 +62,7 @@ spec:
 default images for the components.  This is useful for development.
 
 This will inform the operator to launch a synth server and agent in the desired namespace
-and configure the server with three tasks (`fetch`, `tls_handshake`, and `trace`). These
+and configure the server with three tasks (`fetch`, `tls_handshake`, `ping`, and `trace`). These
 will then be sent to the agent to perform at the specified intervals.
 
 # Tasks
