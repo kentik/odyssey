@@ -5,13 +5,8 @@ metadata:
 spec:
   server_image: r.underland.io/kentik/synsrv:latest
   agent_image: r.underland.io/kentik/ksynth:latest
-  #kentik_company: "116465"
-  #kentik_site: "10445"
-  influxdb:
-    endpoint: "http://influx:8086/api/v2/write"
-    organization: "system"
-    bucket: "default"
-    token: "secret-token"
+  kentik_company: "116465"
+  kentik_site: "10504"
   ping:
     - kind: service
       name: demo

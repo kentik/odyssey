@@ -160,7 +160,7 @@ func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTa
 			cmd = append(cmd, "--output", fmt.Sprintf("influx=%s,username=%s,password=%s,token=%s", influxEndpoint, v.Username, v.Password, v.Token))
 		}
 	}
-	r.Log.Info("agent deployment")
+	r.Log.Info("agent deployment", "endpoint", serverEndpoint)
 	env := []corev1.EnvVar{
 		{
 			Name:  agentApiHostEnvVar,

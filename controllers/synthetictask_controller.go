@@ -34,6 +34,7 @@ import (
 
 	"github.com/go-logr/logr"
 	syntheticsv1 "github.com/kentik/odyssey/api/v1"
+	"github.com/kentik/odyssey/pkg/synthetics"
 )
 
 const (
@@ -89,10 +90,12 @@ type updateConfig struct {
 // SyntheticTaskReconciler reconciles a SyntheticTask object
 type SyntheticTaskReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Log      logr.Logger
-	tasks    map[string]interface{}
-	updateCh chan *updateConfig
+	Scheme         *runtime.Scheme
+	Log            logr.Logger
+	KentikEmail    string
+	KentikAPIToken string
+	tasks          map[string]interface{}
+	updateCh       chan *updateConfig
 }
 
 //+kubebuilder:rbac:groups=synthetics.kentiklabs.com,resources=synthetictasks,verbs=get;list;watch;create;update;patch;delete
@@ -190,6 +193,33 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		log.Error(err, "error getting agent deployment")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// TODO: register with Kentik API if Kentik configured
+	if task.Spec.KentikCompany != "" && task.Spec.KentikSite != "" {
+		podList := &corev1.PodList{}
+		if err := r.List(ctx, podList, client.InNamespace(task.Namespace), client.MatchingLabels(agentLabels(task.Name))); err != nil {
+			if apierrors.IsNotFound(err) {
+				log.Info("waiting on agent deployment")
+				return ctrl.Result{Requeue: true}, nil
+			}
+			return ctrl.Result{}, err
+		}
+		synthClient := synthetics.NewClient(r.KentikEmail, r.KentikAPIToken)
+		// TODO: get list of agents and filter for agent ID
+		agentName := podList.Items[0].Name
+		agent, err := synthClient.GetAgent(ctx, agentName)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		log.Info("authorizing agent", "id", agent.ID)
+
+		// TODO: auth agent id with site
+		if err := synthClient.AuthorizeAgent(ctx, agent.ID, task.Spec.KentikSite); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		log.Info("agent authorized", "id", agent.ID)
 	}
 
 	// build and update config for server
