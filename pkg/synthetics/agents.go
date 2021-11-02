@@ -28,6 +28,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	ErrAgentNotFound = errors.New("agent not found")
+)
+
 type agentResponse struct {
 	Agents []*Agent `json:"agents,omitempty"`
 }
@@ -44,6 +48,7 @@ type agentAuthorizeRequest struct {
 type Agent struct {
 	ID      string `json:"id,omitempty"`
 	Name    string `json:"name,omitempty"`
+	Status  string `json:"status,omitempty"`
 	Alias   string `json:"alias,omitempty"`
 	Type    string `json:"type,omitempty"`
 	OS      string `json:"os,omitempty"`
@@ -84,7 +89,7 @@ func (c *Client) GetAgent(ctx context.Context, name string) (*Agent, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("agent not found for name %s", name)
+	return nil, errors.Wrap(ErrAgentNotFound, name)
 }
 
 func (c *Client) AuthorizeAgent(ctx context.Context, agentID, siteID string) error {
@@ -109,12 +114,18 @@ func (c *Client) AuthorizeAgent(ctx context.Context, agentID, siteID string) err
 		}
 		return errors.Wrap(err, string(errData))
 	}
-	respData, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
 
-	fmt.Println(string(respData))
+	return nil
+}
+
+func (c *Client) DeleteAgent(ctx context.Context, agentID string) error {
+	if resp, err := c.request(ctx, http.MethodDelete, fmt.Sprintf("/agents/%s", agentID), nil); err != nil {
+		errData, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		return errors.Wrap(err, string(errData))
+	}
 
 	return nil
 }

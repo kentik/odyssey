@@ -121,6 +121,7 @@ spec:
                 description: KentikCompany is the company ID to send data to Kentik
                 type: string
               kentik_region:
+                default: US
                 description: KentikRegion is the region to configure for sending data
                   to Kentik
                 enum:

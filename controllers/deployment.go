@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"fmt"
-	"strings"
 
 	syntheticsv1 "github.com/kentik/odyssey/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -136,7 +135,7 @@ func (s *SyntheticTaskReconciler) getServerService(t *syntheticsv1.SyntheticTask
 	}
 }
 
-func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTask, serverService *corev1.Service) *appsv1.Deployment {
+func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTask, serverEndpoint string) *appsv1.Deployment {
 	replicas := int32(1)
 	labels := agentLabels(t.Name)
 	image := t.Spec.AgentImage
@@ -144,21 +143,10 @@ func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTa
 		image = defaultSyntheticAgentImage
 	}
 	cmd := defaultAgentCommand
-	serverEndpoint := ""
-	if t.Spec.KentikCompany != "" {
-		tld := "com"
-		if strings.ToLower(t.Spec.KentikRegion) == "eu" {
-			tld = "eu"
-		}
-		serverEndpoint = fmt.Sprintf("https://api.kentik.%s", tld)
-	} else {
-		serverEndpoint = fmt.Sprintf("http://%s:%d", serverService.Spec.ClusterIP, serverPort)
-		r.Log.Info("configuring for local export", "endpoint", serverEndpoint)
-		if v := t.Spec.InfluxDB; v != nil {
-			influxEndpoint := fmt.Sprintf("%s?org=%s&bucket=%s", v.Endpoint, v.Organization, v.Bucket)
-			r.Log.Info("configuring influxdb output", "target", influxEndpoint)
-			cmd = append(cmd, "--output", fmt.Sprintf("influx=%s,username=%s,password=%s,token=%s", influxEndpoint, v.Username, v.Password, v.Token))
-		}
+	if v := t.Spec.InfluxDB; v != nil {
+		influxEndpoint := fmt.Sprintf("%s?org=%s&bucket=%s", v.Endpoint, v.Organization, v.Bucket)
+		r.Log.Info("configuring influxdb output", "target", influxEndpoint)
+		cmd = append(cmd, "--output", fmt.Sprintf("influx=%s,username=%s,password=%s,token=%s", influxEndpoint, v.Username, v.Password, v.Token))
 	}
 	r.Log.Info("agent deployment", "endpoint", serverEndpoint)
 	env := []corev1.EnvVar{
