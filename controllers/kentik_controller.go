@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	syntheticsv1 "github.com/kentik/odyssey/api/v1"
 	"github.com/kentik/odyssey/pkg/synthetics"
@@ -115,12 +114,10 @@ func (r *KentikReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 		}
 
 		if agent.Status != synthetics.AgentStatusOK {
-			// HACK:
-			time.Sleep(time.Second * 15)
 			log.Info("authorizing agent", "id", agent.ID)
 			// TODO: check if already authorized and skip
 
-			// TODO: auth agent id with site
+			// auth agent id with site
 			if err := synthClient.AuthorizeAgent(ctx, agent.ID, task.Spec.KentikSite); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -147,16 +144,8 @@ func (r *KentikReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// TODO: create tests via API and assign to agents
-	testAgentIDs := []string{}
-	for _, pod := range agentPods {
-		if v, ok := pod.Annotations[agentPodAnnotationAgentID]; ok {
-			testAgentIDs = append(testAgentIDs, v)
-		}
-	}
-
 	// build and update config for server
-	log.Info("checking tasks")
+	log.Info("TODO: remaining tasks")
 	//testIDs := []string{}
 
 	// tls handshake
@@ -362,6 +351,19 @@ func (r *KentikReconciler) Cleanup(ctx context.Context, req ctrl.Request, task *
 		log.Info("checking delete pod finalizer", "pod", pod.Name)
 		if contains(pod.GetFinalizers(), finalizerName) {
 			log.Info("handling finalizer", "pod", pod.Name)
+			// delete tests
+			v, ok := task.Annotations[taskAnnotationTestIDs]
+			if ok {
+				testIDs := strings.Split(v, ",")
+				for _, testID := range testIDs {
+					log.Info("deleting test", "id", testID)
+					if err := synthClient.DeleteTest(ctx, testID); err != nil {
+						return err
+					}
+				}
+			}
+
+			// cleanup agents
 			if id, exists := pod.Annotations[agentPodAnnotationAgentID]; exists {
 				// delete agent if exists
 				if err := synthClient.DeleteAgent(ctx, id); err != nil {
@@ -384,7 +386,6 @@ func (r *KentikReconciler) Cleanup(ctx context.Context, req ctrl.Request, task *
 
 func (r *KentikReconciler) createFetchTasks(ctx context.Context, req ctrl.Request, task *syntheticsv1.SyntheticTask, agentPods []corev1.Pod) (bool, error) {
 	log := r.reconciler.Log.WithValues("name", req.NamespacedName, "namespace", req.Namespace, "controller", "kentik")
-	log.Info("agentPods", "pods", fmt.Sprintf("%+v", agentPods))
 
 	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken)
 	// TODO: get all Kentik Tests and check if already created
@@ -411,9 +412,10 @@ func (r *KentikReconciler) createFetchTasks(ctx context.Context, req ctrl.Reques
 			if !exists {
 				return false, fmt.Errorf("unable to get agent id from pod annotations for %s", pod.Name)
 			}
-			// TODO: check if exists
-			testName := fmt.Sprintf("%s/%s-fetch-%d-%s", task.Namespace, svc.Name, fetch.Port, agentID)
+			// check if exists
+			testName := fmt.Sprintf("%s/%s-fetch-%d", task.Namespace, svc.Name, fetch.Port)
 			if _, exists := testLookup[testName]; exists {
+				// TODO: check if agent matches; if not call UpdateTest with agent id
 				log.Info("test exists", "name", testName)
 				continue
 			}
@@ -424,8 +426,8 @@ func (r *KentikReconciler) createFetchTasks(ctx context.Context, req ctrl.Reques
 			if fetch.TLS {
 				scheme = "https"
 			}
-			serviceEndpoint := fmt.Sprintf("%s://%s:%d%s", scheme, svc.Spec.ClusterIP, fetch.Port, fetch.Target)
-			if err := synthClient.CreateTest(ctx, &synthetics.Test{
+			serviceEndpoint := fmt.Sprintf("%s://%s.%s.svc.cluster.local:%d%s", scheme, svc.Name, task.Namespace, fetch.Port, fetch.Target)
+			test, err := synthClient.CreateTest(ctx, &synthetics.Test{
 				Name: testName,
 				Type: synthetics.TestTypeURL,
 				Settings: &synthetics.TestSettings{
@@ -436,10 +438,25 @@ func (r *KentikReconciler) createFetchTasks(ctx context.Context, req ctrl.Reques
 					},
 					AgentIDs: []string{agentID},
 				},
-			}); err != nil {
+			})
+			if err != nil {
 				return false, err
 			}
-			log.V(0).Info("created fetch test", "name", testName)
+			// update task annotations with test IDs
+			if task.Annotations == nil {
+				task.Annotations = map[string]string{}
+			}
+			v, _ := task.Annotations[taskAnnotationTestIDs]
+			testIDs := []string{}
+			if v != "" {
+				testIDs = strings.Split(v, ",")
+			}
+			testIDs = append(testIDs, test.ID)
+			task.Annotations[taskAnnotationTestIDs] = strings.Join(testIDs, ",")
+			if err := r.reconciler.Update(ctx, task); err != nil {
+				return false, err
+			}
+			log.V(0).Info("created fetch test", "name", testName, "id", test.ID)
 		}
 	}
 

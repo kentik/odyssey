@@ -109,13 +109,14 @@ func (c *Client) AuthorizeAgent(ctx context.Context, agentID, siteID string) err
 		return err
 	}
 
-	resp, err := c.request(ctx, http.MethodPatch, fmt.Sprintf("/agents/%s", agentID), buf)
-	if err != nil {
+	if resp, err := c.request(ctx, http.MethodPatch, fmt.Sprintf("/agents/%s", agentID), buf); err != nil {
 		errData, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
 		}
-		return errors.Wrap(err, string(errData))
+		defer resp.Body.Close()
+
+		return errors.New(string(errData))
 	}
 
 	return nil
@@ -127,7 +128,7 @@ func (c *Client) DeleteAgent(ctx context.Context, agentID string) error {
 		if err != nil {
 			return err
 		}
-		return errors.Wrap(err, string(errData))
+		return errors.New(string(errData))
 	}
 
 	return nil

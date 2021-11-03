@@ -53,6 +53,7 @@ const (
 	agentKentikAgentUpdateEnvVar        = "AGENT_UPDATE"
 	agentKentikAgentAgentIdentityEnvVar = "AGENT_IDENTITY"
 	agentPodAnnotationAgentID           = "com.kentiklabs.synthetics/agentID"
+	taskAnnotationTestIDs               = "com.kentiklabs.synthetics/testIDs"
 )
 
 var (

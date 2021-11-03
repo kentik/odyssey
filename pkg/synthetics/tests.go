@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -32,6 +33,7 @@ const (
 	TestTypeURL = "url"
 	// Test Status
 	TestStatusActive = "TEST_STATUS_ACTIVE"
+	TestStatusPaused = "TEST_STATUS_PAUSED"
 	// Test Tasks
 	TestTaskHTTP  = "http"
 	TestTaskTrace = "trace"
@@ -46,8 +48,17 @@ type testCreateRequest struct {
 	Test *Test `json:"test"`
 }
 
+type testCreateResponse struct {
+	Test *Test `json:"test"`
+}
+
 type testsResponse struct {
 	Tests []*Test `json:"tests"`
+}
+
+type testUpdateRequest struct {
+	Test *Test  `json:"test"`
+	Mask string `json:"mask"`
 }
 
 type Test struct {
@@ -216,7 +227,7 @@ func (c *Client) Tests(ctx context.Context) ([]*Test, error) {
 	return testsResponse.Tests, nil
 }
 
-func (c *Client) CreateTest(ctx context.Context, t *Test) error {
+func (c *Client) CreateTest(ctx context.Context, t *Test) (*Test, error) {
 	// TODO: perhaps use a default and then merge with param?
 	// validation
 	if t.DeviceID == "" {
@@ -253,27 +264,78 @@ func (c *Client) CreateTest(ctx context.Context, t *Test) error {
 	if err := json.NewEncoder(buf).Encode(testCreateRequest{
 		Test: t,
 	}); err != nil {
-		return err
+		return nil, err
 	}
-
-	fmt.Println(string(buf.Bytes()))
 
 	resp, err := c.request(ctx, http.MethodPost, "/tests", buf)
 	if err != nil {
 		errData, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		return errors.Wrap(err, string(errData))
+		defer resp.Body.Close()
+		return nil, errors.Wrap(err, string(errData))
 	}
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
+	var createResp testCreateResponse
+	if err := json.NewDecoder(resp.Body).Decode(&createResp); err != nil {
+		return nil, err
+	}
+
+	return createResp.Test, nil
+}
+
+func (c *Client) UpdateTest(ctx context.Context, t *Test, updateFields []string) error {
+	mask := []string{}
+	for _, field := range updateFields {
+		mask = append(mask, "test."+field)
+	}
+	// ensure required fields are set for api
+	if t.Settings.Family == "" {
+		t.Settings.Family = TestIPFamilyV4
+	}
+	// serialize
+	buf := &bytes.Buffer{}
+	if err := json.NewEncoder(buf).Encode(&testUpdateRequest{
+		Test: t,
+		Mask: strings.Join(mask, ","),
+	}); err != nil {
 		return err
 	}
 
-	fmt.Println(string(data))
+	resp, err := c.request(ctx, http.MethodPatch, fmt.Sprintf("/tests/%s", t.ID), buf)
+	if err != nil {
+		errData, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		return errors.New(string(errData))
+	}
+
+	if resp.StatusCode > http.StatusOK {
+		errData, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		return errors.New(string(errData))
+	}
+
+	return nil
+}
+
+func (c *Client) DeleteTest(ctx context.Context, testID string) error {
+	if resp, err := c.request(ctx, http.MethodDelete, fmt.Sprintf("/tests/%s", testID), nil); err != nil {
+		errData, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		return errors.New(string(errData))
+	}
 
 	return nil
 }
