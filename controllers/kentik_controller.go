@@ -89,8 +89,7 @@ func (r *KentikReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 
 	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken)
 
-	// register with Kentik API if Kentik configured
-	// TODO: deletion with finalizer to DELETE agent from API
+	// finalizers
 	for _, pod := range agentPods {
 		// deletion / finalizer
 		if pod.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -114,50 +113,52 @@ func (r *KentikReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 			}
 			return ctrl.Result{}, err
 		}
-		// HACK:
-		time.Sleep(time.Second * 15)
-		log.Info("authorizing agent", "id", agent.ID)
 
-		// TODO: auth agent id with site
-		if err := synthClient.AuthorizeAgent(ctx, agent.ID, task.Spec.KentikSite); err != nil {
-			return ctrl.Result{}, err
-		}
-		if pod.Annotations == nil {
-			pod.Annotations = map[string]string{}
-		}
-		pod.Annotations[agentPodAnnotationAgentID] = agent.ID
-		if err := r.reconciler.Update(ctx, &pod); err != nil {
-			return ctrl.Result{}, err
-		}
+		if agent.Status != synthetics.AgentStatusOK {
+			// HACK:
+			time.Sleep(time.Second * 15)
+			log.Info("authorizing agent", "id", agent.ID)
+			// TODO: check if already authorized and skip
 
-		log.Info("agent authorized", "id", agent.ID)
+			// TODO: auth agent id with site
+			if err := synthClient.AuthorizeAgent(ctx, agent.ID, task.Spec.KentikSite); err != nil {
+				return ctrl.Result{}, err
+			}
+			if pod.Annotations == nil {
+				pod.Annotations = map[string]string{}
+			}
+			pod.Annotations[agentPodAnnotationAgentID] = agent.ID
+			if err := r.reconciler.Update(ctx, &pod); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			log.Info("agent authorized", "id", agent.ID)
+			return ctrl.Result{Requeue: true}, nil
+		}
+	}
+
+	// fetch tasks
+	fetchTasksCreated, err := r.createFetchTasks(ctx, req, task, agentPods)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	log.Info("fetchTasks", "status", fetchTasksCreated)
+	if fetchTasksCreated {
 		return ctrl.Result{Requeue: true}, nil
 	}
 
 	// TODO: create tests via API and assign to agents
+	testAgentIDs := []string{}
+	for _, pod := range agentPods {
+		if v, ok := pod.Annotations[agentPodAnnotationAgentID]; ok {
+			testAgentIDs = append(testAgentIDs, v)
+		}
+	}
 
 	// build and update config for server
 	log.Info("checking tasks")
 	//testIDs := []string{}
 
-	// fetch
-	for _, fetch := range task.Spec.Fetch {
-		var svc corev1.Service
-		if err := r.reconciler.Get(ctx, types.NamespacedName{Name: fetch.Service, Namespace: req.NamespacedName.Namespace}, &svc); err != nil {
-			return ctrl.Result{}, err
-		}
-		log.Info("building fetch configuration for service", "service", svc.Name)
-		scheme := "http"
-		if fetch.TLS {
-			scheme = "https"
-		}
-		serviceEndpoint := fmt.Sprintf("%s://%s:%d%s", scheme, svc.Spec.ClusterIP, fetch.Port, fetch.Target)
-
-		// override target with service info
-		fetch.Target = serviceEndpoint
-
-		log.V(0).Info("adding fetch", "fetch", fmt.Sprintf("%+v", fetch))
-	}
 	// tls handshake
 	for _, tlsHandshake := range task.Spec.TLSHandshake {
 		var ingress networkingv1.Ingress
@@ -379,6 +380,70 @@ func (r *KentikReconciler) Cleanup(ctx context.Context, req ctrl.Request, task *
 	}
 
 	return nil
+}
+
+func (r *KentikReconciler) createFetchTasks(ctx context.Context, req ctrl.Request, task *syntheticsv1.SyntheticTask, agentPods []corev1.Pod) (bool, error) {
+	log := r.reconciler.Log.WithValues("name", req.NamespacedName, "namespace", req.Namespace, "controller", "kentik")
+	log.Info("agentPods", "pods", fmt.Sprintf("%+v", agentPods))
+
+	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken)
+	// TODO: get all Kentik Tests and check if already created
+
+	tests, err := synthClient.Tests(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	testLookup := map[string]*synthetics.Test{}
+	for _, t := range tests {
+		testLookup[t.Name] = t
+	}
+
+	// fetch
+	created := false
+	for _, fetch := range task.Spec.Fetch {
+		var svc corev1.Service
+		if err := r.reconciler.Get(ctx, types.NamespacedName{Name: fetch.Service, Namespace: req.NamespacedName.Namespace}, &svc); err != nil {
+			return false, err
+		}
+		for _, pod := range agentPods {
+			agentID, exists := pod.Annotations[agentPodAnnotationAgentID]
+			if !exists {
+				return false, fmt.Errorf("unable to get agent id from pod annotations for %s", pod.Name)
+			}
+			// TODO: check if exists
+			testName := fmt.Sprintf("%s/%s-fetch-%d-%s", task.Namespace, svc.Name, fetch.Port, agentID)
+			if _, exists := testLookup[testName]; exists {
+				log.Info("test exists", "name", testName)
+				continue
+			}
+			created = true
+
+			log.Info("building fetch configuration for service", "service", svc.Name)
+			scheme := "http"
+			if fetch.TLS {
+				scheme = "https"
+			}
+			serviceEndpoint := fmt.Sprintf("%s://%s:%d%s", scheme, svc.Spec.ClusterIP, fetch.Port, fetch.Target)
+			if err := synthClient.CreateTest(ctx, &synthetics.Test{
+				Name: testName,
+				Type: synthetics.TestTypeURL,
+				Settings: &synthetics.TestSettings{
+					RollupLevel: 60,
+					Tasks:       []string{synthetics.TestTaskHTTP},
+					URL: &synthetics.URLTest{
+						Target: serviceEndpoint,
+					},
+					AgentIDs: []string{agentID},
+				},
+			}); err != nil {
+				return false, err
+			}
+			log.V(0).Info("created fetch test", "name", testName)
+		}
+	}
+
+	return created, nil
 }
 
 func contains(list []string, s string) bool {

@@ -32,26 +32,27 @@ import (
 )
 
 const (
-	defaultSyntheticServerImage      = "docker.io/kentiklabs/synsrv:latest"
-	defaultSyntheticAgentImage       = "docker.io/kentik/ksynth:latest"
-	ownerKey                         = ".metadata.controller"
-	serverName                       = "synthetics-server"
-	agentName                        = "synthetics-agent"
-	serverLabel                      = "kentiklabs.synthetics.server"
-	agentLabel                       = "kentiklabs.synthetics.agent"
-	serverDeploymentConfigVolumeName = "config"
-	serverDeploymentContainerName    = "synthetics-server"
-	serverPortName                   = "server"
-	serverPort                       = int32(8080)
-	serverConfigMapName              = "server-config.yml"
-	agentDeploymentContainerName     = "synthetics-agent"
-	finalizerName                    = "com.kentiklabs.synthetics/finalizer"
-	agentApiHostEnvVar               = "KENTIK_API_HOST"
-	agentKentikCompanyEnvVar         = "KENTIK_COMPANY"
-	agentKentikSiteEnvVar            = "KENTIK_SITE"
-	agentKentikRegionEnvVar          = "KENTIK_REGION"
-	agentKentikAgentUpdateEnvVar     = "AGENT_UPDATE"
-	agentPodAnnotationAgentID        = "com.kentiklabs.synthetics/agentID"
+	defaultSyntheticServerImage         = "docker.io/kentiklabs/synsrv:latest"
+	defaultSyntheticAgentImage          = "docker.io/kentik/ksynth:latest"
+	ownerKey                            = ".metadata.controller"
+	serverName                          = "synthetics-server"
+	agentName                           = "synthetics-agent"
+	serverLabel                         = "kentiklabs.synthetics.server"
+	agentLabel                          = "kentiklabs.synthetics.agent"
+	serverDeploymentConfigVolumeName    = "config"
+	serverDeploymentContainerName       = "synthetics-server"
+	serverPortName                      = "server"
+	serverPort                          = int32(8080)
+	serverConfigMapName                 = "server-config.yml"
+	agentDeploymentContainerName        = "synthetics-agent"
+	finalizerName                       = "com.kentiklabs.synthetics/finalizer"
+	agentApiHostEnvVar                  = "KENTIK_API_HOST"
+	agentKentikCompanyEnvVar            = "KENTIK_COMPANY"
+	agentKentikSiteEnvVar               = "KENTIK_SITE"
+	agentKentikRegionEnvVar             = "KENTIK_REGION"
+	agentKentikAgentUpdateEnvVar        = "AGENT_UPDATE"
+	agentKentikAgentAgentIdentityEnvVar = "AGENT_IDENTITY"
+	agentPodAnnotationAgentID           = "com.kentiklabs.synthetics/agentID"
 )
 
 var (

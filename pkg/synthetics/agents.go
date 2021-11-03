@@ -28,6 +28,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	// Agent Status
+	AgentStatusOK = "AGENT_STATUS_OK"
+)
+
 var (
 	ErrAgentNotFound = errors.New("agent not found")
 )
@@ -94,17 +99,15 @@ func (c *Client) GetAgent(ctx context.Context, name string) (*Agent, error) {
 
 func (c *Client) AuthorizeAgent(ctx context.Context, agentID, siteID string) error {
 	buf := &bytes.Buffer{}
-	data, err := json.Marshal(agentAuthorizeRequest{
+	if err := json.NewEncoder(buf).Encode(agentAuthorizeRequest{
 		Agent: &authorizeAgent{
-			Status: "AGENT_STATUS_OK",
+			Status: AgentStatusOK,
 			SiteID: siteID,
 		},
 		Mask: "agent.status",
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
-	buf.Write(data)
 
 	resp, err := c.request(ctx, http.MethodPatch, fmt.Sprintf("/agents/%s", agentID), buf)
 	if err != nil {

@@ -52,10 +52,8 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			agentsCommand,
+			testsCommand,
 		},
-	}
-	app.Commands = []*cli.Command{
-		agentsCommand,
 	}
 
 	if err := app.Run(os.Args); err != nil {

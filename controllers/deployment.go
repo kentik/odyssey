@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"fmt"
+	"time"
 
 	syntheticsv1 "github.com/kentik/odyssey/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -156,7 +157,11 @@ func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTa
 		},
 		{
 			Name:  agentKentikAgentUpdateEnvVar,
-			Value: "false",
+			Value: "true",
+		},
+		{
+			Name:  agentKentikAgentAgentIdentityEnvVar,
+			Value: fmt.Sprintf("%d", time.Now().UnixNano()),
 		},
 	}
 	if v := t.Spec.KentikCompany; v != "" {
