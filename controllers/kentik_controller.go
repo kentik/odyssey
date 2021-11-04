@@ -21,12 +21,12 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	syntheticsv1 "github.com/kentik/odyssey/api/v1"
 	"github.com/kentik/odyssey/pkg/synthetics"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -51,7 +51,6 @@ func NewKentikReconciler(r *SyntheticTaskReconciler, kentikEmail, kentikAPIToken
 func (r *KentikReconciler) Reconcile(ctx context.Context, req ctrl.Request, task *syntheticsv1.SyntheticTask) (ctrl.Result, error) {
 	log := r.reconciler.Log.WithValues("name", req.NamespacedName, "namespace", req.Namespace, "controller", "kentik")
 
-	log.Info("checking agent deployment", "name", task.Name, "namespace", task.Namespace)
 	// ksynth agent deployment
 	currentAgentDeployment := appsv1.Deployment{}
 	if err := r.reconciler.Get(ctx, types.NamespacedName{Name: getAgentDeploymentName(task), Namespace: task.Namespace}, &currentAgentDeployment); err != nil {
@@ -84,6 +83,11 @@ func (r *KentikReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 			return ctrl.Result{Requeue: true}, nil
 		}
 		return ctrl.Result{}, err
+	}
+
+	if len(agentPods) != int(*currentAgentDeployment.Spec.Replicas) {
+		log.Info(fmt.Sprintf("waiting on agent pods (%d/%d)", len(agentPods), *currentAgentDeployment.Spec.Replicas))
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken)
@@ -139,195 +143,39 @@ func (r *KentikReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	log.Info("fetchTasks", "status", fetchTasksCreated)
 	if fetchTasksCreated {
+		return ctrl.Result{Requeue: true}, nil
+	}
+	// ping
+	pingTasksCreated, err := r.createPingTasks(ctx, req, task, agentPods)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if pingTasksCreated {
+		return ctrl.Result{Requeue: true}, nil
+	}
+	// trace
+	traceTasksCreated, err := r.createTraceTasks(ctx, req, task, agentPods)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if traceTasksCreated {
 		return ctrl.Result{Requeue: true}, nil
 	}
 
 	// build and update config for server
-	log.Info("TODO: remaining tasks")
-	//testIDs := []string{}
 
-	// tls handshake
-	for _, tlsHandshake := range task.Spec.TLSHandshake {
-		var ingress networkingv1.Ingress
-		if err := r.reconciler.Get(ctx, types.NamespacedName{Name: tlsHandshake.Ingress, Namespace: req.NamespacedName.Namespace}, &ingress); err != nil {
-			return ctrl.Result{}, err
-		}
-		log.Info("building tls handshake configuration for ingress", "ingress", ingress.Name)
-		log.V(0).Info("adding tls handshake", "shake", fmt.Sprintf("%+v", tlsHandshake))
-		for _, rule := range ingress.Spec.Rules {
-			log.Info("adding tls handshake rule", "host", rule.Host)
-			tlsHandshake.Target = rule.Host
-		}
-	}
-	// ping
-	for _, ping := range task.Spec.Ping {
-		log.Info("adding ping", "kind", ping.Kind, "name", ping.Name)
-		switch strings.ToLower(ping.Kind) {
-		case "deployment":
-			log.Info("building ping configuration for deployment", "ping", ping.Name)
-			var deploy appsv1.Deployment
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &deploy); err != nil {
-				return ctrl.Result{}, err
-			}
-			podList := &corev1.PodList{}
-			if err := r.reconciler.List(ctx, podList, client.InNamespace(task.Namespace), client.MatchingLabels(deploy.Spec.Selector.MatchLabels)); err != nil {
-				return ctrl.Result{}, err
-			}
-			log.Info("adding ping", "deployment", deploy.Name)
-			existingPods := map[string]struct{}{}
-			for _, pod := range podList.Items {
-				log.Info("adding ping", "pod", pod.Name)
-				if pod.Status.PodIP == "" {
-					// wait on pod ip
-					log.Info("waiting on pod ip", "ping", ping.Name, "pod", pod.Name)
-					return ctrl.Result{Requeue: true}, nil
-				}
-				if _, exists := existingPods[pod.Status.PodIP]; exists {
-					log.Info("skipping existing pod", "pod", pod.Name)
-					continue
-				}
-				ping.Target = pod.Status.PodIP
-			}
-		case "pod":
-			log.Info("building ping configuration for pod", "ping", ping.Name)
-			var pod corev1.Pod
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &pod); err != nil {
-				return ctrl.Result{}, err
-			}
-			if pod.Status.PodIP == "" {
-				// wait on pod ip
-				log.Info("waiting on pod ip", "ping", ping.Name, "pod", pod.Name)
-				return ctrl.Result{Requeue: true}, nil
-			}
-			log.Info("adding ping", "pod", pod.Name)
-			ping.Target = pod.Status.PodIP
-		case "service":
-			log.Info("building ping configuration for service", "ping", ping.Name)
-			var service corev1.Service
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &service); err != nil {
-				return ctrl.Result{}, err
-			}
-			log.Info("adding ping", "service", service.Name)
-			ping.Target = service.Spec.ClusterIP
-		case "ingress":
-			log.Info("building ping configuration for ingress", "ping", ping.Name)
-			var ingress networkingv1.Ingress
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &ingress); err != nil {
-				return ctrl.Result{}, err
-			}
-			log.Info("adding ping", "ingress", ingress.Name)
-			for _, rule := range ingress.Spec.Rules {
-				log.Info("adding ping rule", "host", rule.Host)
-				ping.Target = rule.Host
-			}
-		default:
-			return ctrl.Result{}, fmt.Errorf("invalid ping kind %s", ping.Kind)
-		}
-	}
-
-	// trace
-	for _, trace := range task.Spec.Trace {
-		log.Info("adding trace", "kind", trace.Kind, "name", trace.Name)
-		switch strings.ToLower(trace.Kind) {
-		case "deployment":
-			log.Info("building trace configuration for deployment", "trace", trace.Name)
-			var deploy appsv1.Deployment
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: trace.Name, Namespace: req.NamespacedName.Namespace}, &deploy); err != nil {
-				return ctrl.Result{}, err
-			}
-			podList := &corev1.PodList{}
-			if err := r.reconciler.List(ctx, podList, client.InNamespace(task.Namespace), client.MatchingLabels(deploy.Spec.Selector.MatchLabels)); err != nil {
-				return ctrl.Result{}, err
-			}
-			log.Info("adding trace", "deployment", deploy.Name)
-			existingPods := map[string]struct{}{}
-			for _, pod := range podList.Items {
-				log.Info("adding trace", "pod", pod.Name)
-				if pod.Status.PodIP == "" {
-					// wait on pod ip
-					log.Info("waiting on pod ip", "trace", trace.Name, "pod", pod.Name)
-					return ctrl.Result{Requeue: true}, nil
-				}
-				if _, exists := existingPods[pod.Status.PodIP]; exists {
-					log.Info("skipping existing pod", "pod", pod.Name)
-					continue
-				}
-				trace.Target = pod.Status.PodIP
-			}
-		case "pod":
-			log.Info("building trace configuration for pod", "trace", trace.Name)
-			var pod corev1.Pod
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: trace.Name, Namespace: req.NamespacedName.Namespace}, &pod); err != nil {
-				return ctrl.Result{}, err
-			}
-			if pod.Status.PodIP == "" {
-				// wait on pod ip
-				log.Info("waiting on pod ip", "trace", trace.Name, "pod", pod.Name)
-				return ctrl.Result{Requeue: true}, nil
-			}
-			log.Info("adding trace", "pod", pod.Name)
-			trace.Target = pod.Status.PodIP
-		case "service":
-			log.Info("building trace configuration for service", "trace", trace.Name)
-			var service corev1.Service
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: trace.Name, Namespace: req.NamespacedName.Namespace}, &service); err != nil {
-				return ctrl.Result{}, err
-			}
-			log.Info("adding trace", "service", service.Name)
-			target := fmt.Sprintf("%s:%d", service.Spec.ClusterIP, trace.Port)
-			trace.Target = target
-		case "ingress":
-			log.Info("building trace configuration for ingress", "trace", trace.Name)
-			var ingress networkingv1.Ingress
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: trace.Name, Namespace: req.NamespacedName.Namespace}, &ingress); err != nil {
-				return ctrl.Result{}, err
-			}
-			log.Info("adding trace", "ingress", ingress.Name)
-			for _, rule := range ingress.Spec.Rules {
-				log.Info("adding trace rule", "host", rule.Host)
-				trace.Target = rule.Host
-			}
-		default:
-			return ctrl.Result{}, fmt.Errorf("invalid trace kind %s", trace.Kind)
-		}
-	}
-
-	//updateID := generateUpdateID(testIDs)
-	//log.Info("checking update", "updateID", updateID, "current", task.Status.UpdateID)
-
-	//if task.Status.UpdateID != updateID {
-	//	log.Info("update required", "task", task.Name)
-	//	task.Status.UpdateID = updateID
-	//	task.Status.DeployNeeded = true
-
-	//	log.Info("config update", "config", configData)
-	//	if err := r.reconciler.Status().Update(ctx, task); err != nil {
+	//// tls handshake
+	//for _, tlsHandshake := range task.Spec.TLSHandshake {
+	//	var ingress networkingv1.Ingress
+	//	if err := r.reconciler.Get(ctx, types.NamespacedName{Name: tlsHandshake.Ingress, Namespace: req.NamespacedName.Namespace}, &ingress); err != nil {
 	//		return ctrl.Result{}, err
 	//	}
-
-	//	return ctrl.Result{Requeue: true}, nil
-	//}
-
-	//if task.Status.DeployNeeded {
-	//	log.Info("deploy needed", "task", task.Name)
-	//	podList := &corev1.PodList{}
-	//	if err := r.reconciler.List(ctx, podList, client.InNamespace(task.Namespace), client.MatchingLabels(serverLabels(task.Name))); err != nil {
-	//		return ctrl.Result{}, err
-	//	}
-
-	//	for _, pod := range podList.Items {
-	//		log.Info("deleting pod", "pod", pod.Name)
-	//		if err := r.reconciler.Delete(ctx, &pod); err != nil {
-	//			if !apierrors.IsNotFound(err) {
-	//				return ctrl.Result{}, err
-	//			}
-	//		}
-	//	}
-	//	task.Status.DeployNeeded = false
-	//	if err := r.reconciler.Status().Update(ctx, task); err != nil {
-	//		return ctrl.Result{}, err
+	//	log.Info("building tls handshake configuration for ingress", "ingress", ingress.Name)
+	//	log.V(0).Info("adding tls handshake", "shake", fmt.Sprintf("%+v", tlsHandshake))
+	//	for _, rule := range ingress.Spec.Rules {
+	//		log.Info("adding tls handshake rule", "host", rule.Host)
+	//		tlsHandshake.Target = rule.Host
 	//	}
 	//}
 
@@ -400,6 +248,16 @@ func (r *KentikReconciler) createFetchTasks(ctx context.Context, req ctrl.Reques
 		testLookup[t.Name] = t
 	}
 
+	// get agentIDs
+	agentIDs := []string{}
+	for _, pod := range agentPods {
+		agentID, exists := pod.Annotations[agentPodAnnotationAgentID]
+		if !exists {
+			return false, fmt.Errorf("unable to get agent id from pod annotations for %s", pod.Name)
+		}
+		agentIDs = append(agentIDs, agentID)
+	}
+
 	// fetch
 	created := false
 	for _, fetch := range task.Spec.Fetch {
@@ -407,60 +265,347 @@ func (r *KentikReconciler) createFetchTasks(ctx context.Context, req ctrl.Reques
 		if err := r.reconciler.Get(ctx, types.NamespacedName{Name: fetch.Service, Namespace: req.NamespacedName.Namespace}, &svc); err != nil {
 			return false, err
 		}
-		for _, pod := range agentPods {
-			agentID, exists := pod.Annotations[agentPodAnnotationAgentID]
-			if !exists {
-				return false, fmt.Errorf("unable to get agent id from pod annotations for %s", pod.Name)
-			}
-			// check if exists
-			testName := fmt.Sprintf("%s/%s-fetch-%d", task.Namespace, svc.Name, fetch.Port)
-			if _, exists := testLookup[testName]; exists {
-				// TODO: check if agent matches; if not call UpdateTest with agent id
-				log.Info("test exists", "name", testName)
-				continue
-			}
-			created = true
-
-			log.Info("building fetch configuration for service", "service", svc.Name)
-			scheme := "http"
-			if fetch.TLS {
-				scheme = "https"
-			}
-			serviceEndpoint := fmt.Sprintf("%s://%s.%s.svc.cluster.local:%d%s", scheme, svc.Name, task.Namespace, fetch.Port, fetch.Target)
-			test, err := synthClient.CreateTest(ctx, &synthetics.Test{
-				Name: testName,
-				Type: synthetics.TestTypeURL,
-				Settings: &synthetics.TestSettings{
-					RollupLevel: 60,
-					Tasks:       []string{synthetics.TestTaskHTTP},
-					URL: &synthetics.URLTest{
-						Target: serviceEndpoint,
-					},
-					AgentIDs: []string{agentID},
-				},
-			})
-			if err != nil {
-				return false, err
-			}
-			// update task annotations with test IDs
-			if task.Annotations == nil {
-				task.Annotations = map[string]string{}
-			}
-			v, _ := task.Annotations[taskAnnotationTestIDs]
-			testIDs := []string{}
-			if v != "" {
-				testIDs = strings.Split(v, ",")
-			}
-			testIDs = append(testIDs, test.ID)
-			task.Annotations[taskAnnotationTestIDs] = strings.Join(testIDs, ",")
-			if err := r.reconciler.Update(ctx, task); err != nil {
-				return false, err
-			}
-			log.V(0).Info("created fetch test", "name", testName, "id", test.ID)
+		// check if exists
+		testName := fmt.Sprintf("%s/%s-fetch-%d", task.Namespace, svc.Name, fetch.Port)
+		if _, exists := testLookup[testName]; exists {
+			// check if agent matches; if not call UpdateTest with agent id
+			log.Info("test exists", "name", testName)
+			continue
 		}
+		created = true
+
+		log.Info("building fetch configuration for service", "service", svc.Name)
+		scheme := "http"
+		if fetch.TLS {
+			scheme = "https"
+		}
+		serviceEndpoint := fmt.Sprintf("%s://%s.%s.svc.cluster.local:%d%s", scheme, svc.Name, task.Namespace, fetch.Port, fetch.Target)
+		test, err := synthClient.CreateTest(ctx, &synthetics.Test{
+			Name: testName,
+			Type: synthetics.TestTypeURL,
+			Settings: &synthetics.TestSettings{
+				RollupLevel: 60,
+				Tasks:       []string{synthetics.TestTaskHTTP},
+				URL: &synthetics.URLTest{
+					Target: serviceEndpoint,
+				},
+				AgentIDs: agentIDs,
+			},
+		})
+		if err != nil {
+			return false, err
+		}
+		// update task annotations with test IDs
+		if err := r.updateTaskTestIDs(ctx, task, test.ID); err != nil {
+			return false, err
+		}
+		log.Info("created fetch test", "name", testName, "id", test.ID)
 	}
 
 	return created, nil
+}
+
+func (r *KentikReconciler) createPingTasks(ctx context.Context, req ctrl.Request, task *syntheticsv1.SyntheticTask, agentPods []corev1.Pod) (bool, error) {
+	log := r.reconciler.Log.WithValues("name", req.NamespacedName, "namespace", req.Namespace, "controller", "kentik")
+
+	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken)
+
+	tests, err := synthClient.Tests(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	testLookup := map[string]*synthetics.Test{}
+	for _, t := range tests {
+		testLookup[t.Name] = t
+	}
+
+	// get agentIDs
+	agentIDs := []string{}
+	for _, pod := range agentPods {
+		agentID, exists := pod.Annotations[agentPodAnnotationAgentID]
+		if !exists {
+			return false, fmt.Errorf("unable to get agent id from pod annotations for %s", pod.Name)
+		}
+		agentIDs = append(agentIDs, agentID)
+	}
+
+	// ping
+	created := false
+	for _, ping := range task.Spec.Ping {
+		// create test per agent
+		testName := fmt.Sprintf("%s/ping-%s", task.Namespace, ping.Name)
+		if _, exists := testLookup[testName]; exists {
+			// check if agent matches; if not call UpdateTest with agent id
+			log.Info("test exists", "name", testName)
+			continue
+		}
+		created = true
+
+		targetIPs := []string{}
+		switch strings.ToLower(ping.Kind) {
+		case "deployment":
+			// check if exists
+			var deploy appsv1.Deployment
+			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &deploy); err != nil {
+				return false, err
+			}
+			podList := &corev1.PodList{}
+			if err := r.reconciler.List(ctx, podList, client.InNamespace(task.Namespace), client.MatchingLabels(deploy.Spec.Selector.MatchLabels)); err != nil {
+				return false, err
+			}
+			existingPods := map[string]struct{}{}
+			for _, pod := range podList.Items {
+				log.Info("building ping configuration for deployment", "ping", ping.Name)
+				if pod.Status.PodIP == "" {
+					// wait on pod ip
+					log.Info("waiting on pod ip", "ping", ping.Name, "pod", pod.Name)
+					return true, nil
+				}
+				if _, exists := existingPods[pod.Status.PodIP]; exists {
+					log.Info("skipping existing pod", "pod", pod.Name)
+					continue
+				}
+				targetIPs = append(targetIPs, pod.Status.PodIP)
+				log.Info("added target ip for ping", "deployment", deploy.Name, "pod", pod.Name, "ip", pod.Status.PodIP)
+			}
+		case "pod":
+			log.Info("building ping configuration for pod", "ping", ping.Name)
+			var pod corev1.Pod
+			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &pod); err != nil {
+				return false, err
+			}
+			if pod.Status.PodIP == "" {
+				// wait on pod ip
+				log.Info("waiting on pod ip", "ping", ping.Name, "pod", pod.Name)
+				return true, err
+			}
+			targetIPs = append(targetIPs, pod.Status.PodIP)
+			log.Info("added target ip for ping", "pod", pod.Name, "ip", pod.Status.PodIP)
+		case "service":
+			log.Info("building ping configuration for service", "ping", ping.Name)
+			var service corev1.Service
+			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &service); err != nil {
+				return false, err
+			}
+			targetIPs = append(targetIPs, service.Spec.ClusterIP)
+			log.Info("added target ip for ping", "service", service.Name, "ip", service.Spec.ClusterIP)
+		default:
+			return false, fmt.Errorf("invalid ping kind %s", ping.Kind)
+		}
+
+		pingPeriod, err := time.ParseDuration(ping.Period)
+		if err != nil {
+			return false, err
+		}
+		pingDelay, err := time.ParseDuration(ping.Delay)
+		if err != nil {
+			return false, err
+		}
+		pingExpiry, err := time.ParseDuration(ping.Expiry)
+		if err != nil {
+			return false, err
+		}
+
+		test, err := synthClient.CreateTest(ctx, &synthetics.Test{
+			Name: testName,
+			Type: synthetics.TestTypeIP,
+			Settings: &synthetics.TestSettings{
+				RollupLevel: 60,
+				Tasks:       []string{synthetics.TestTaskPing},
+				Protocol:    synthetics.TestProtocolICMP,
+				Ping: &synthetics.PingTest{
+					Period: pingPeriod.Seconds(),
+					Count:  float64(ping.Count),
+					Delay:  pingDelay.Seconds(),
+					Expiry: float64(pingExpiry.Milliseconds()),
+				},
+				Trace: &synthetics.TraceTest{
+					Protocol: synthetics.TestProtocolUDP,
+					Period:   pingPeriod.Seconds(),
+					Count:    float64(ping.Count),
+					Delay:    pingDelay.Seconds(),
+					Expiry:   float64(pingExpiry.Milliseconds()),
+				},
+				IP: &synthetics.TestIP{
+					Targets: targetIPs,
+				},
+				AgentIDs: agentIDs,
+			},
+		})
+		if err != nil {
+			return false, err
+		}
+
+		if err := r.updateTaskTestIDs(ctx, task, test.ID); err != nil {
+			return false, err
+		}
+		log.Info("created ping test", "name", testName, "id", test.ID)
+	}
+
+	return created, nil
+}
+
+func (r *KentikReconciler) createTraceTasks(ctx context.Context, req ctrl.Request, task *syntheticsv1.SyntheticTask, agentPods []corev1.Pod) (bool, error) {
+	log := r.reconciler.Log.WithValues("name", req.NamespacedName, "namespace", req.Namespace, "controller", "kentik")
+
+	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken)
+
+	tests, err := synthClient.Tests(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	testLookup := map[string]*synthetics.Test{}
+	for _, t := range tests {
+		testLookup[t.Name] = t
+	}
+
+	// get agentIDs
+	agentIDs := []string{}
+	for _, pod := range agentPods {
+		agentID, exists := pod.Annotations[agentPodAnnotationAgentID]
+		if !exists {
+			return false, fmt.Errorf("unable to get agent id from pod annotations for %s", pod.Name)
+		}
+		agentIDs = append(agentIDs, agentID)
+	}
+
+	// trace
+	created := false
+	for _, trace := range task.Spec.Trace {
+		// create test per agent
+		testName := fmt.Sprintf("%s/trace-%s", task.Namespace, trace.Name)
+		if _, exists := testLookup[testName]; exists {
+			// check if agent matches; if not call UpdateTest with agent id
+			log.Info("test exists", "name", testName)
+			continue
+		}
+		created = true
+
+		targetIPs := []string{}
+		switch strings.ToLower(trace.Kind) {
+		case "deployment":
+			// check if exists
+			var deploy appsv1.Deployment
+			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: trace.Name, Namespace: req.NamespacedName.Namespace}, &deploy); err != nil {
+				return false, err
+			}
+			podList := &corev1.PodList{}
+			if err := r.reconciler.List(ctx, podList, client.InNamespace(task.Namespace), client.MatchingLabels(deploy.Spec.Selector.MatchLabels)); err != nil {
+				return false, err
+			}
+			existingPods := map[string]struct{}{}
+			for _, pod := range podList.Items {
+				log.Info("building trace configuration for deployment", "trace", trace.Name)
+				if pod.Status.PodIP == "" {
+					// wait on pod ip
+					log.Info("waiting on pod ip", "trace", trace.Name, "pod", pod.Name)
+					return true, nil
+				}
+				if _, exists := existingPods[pod.Status.PodIP]; exists {
+					log.Info("skipping existing pod", "pod", pod.Name)
+					continue
+				}
+				targetIPs = append(targetIPs, pod.Status.PodIP)
+				log.Info("added target ip for trace", "deployment", deploy.Name, "pod", pod.Name, "ip", pod.Status.PodIP)
+			}
+		case "pod":
+			log.Info("building trace configuration for pod", "trace", trace.Name)
+			var pod corev1.Pod
+			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: trace.Name, Namespace: req.NamespacedName.Namespace}, &pod); err != nil {
+				return false, err
+			}
+			if pod.Status.PodIP == "" {
+				// wait on pod ip
+				log.Info("waiting on pod ip", "trace", trace.Name, "pod", pod.Name)
+				return true, err
+			}
+			targetIPs = append(targetIPs, pod.Status.PodIP)
+			log.Info("added target ip for trace", "pod", pod.Name, "ip", pod.Status.PodIP)
+		case "service":
+			log.Info("building trace configuration for service", "trace", trace.Name)
+			var service corev1.Service
+			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: trace.Name, Namespace: req.NamespacedName.Namespace}, &service); err != nil {
+				return false, err
+			}
+			targetIPs = append(targetIPs, service.Spec.ClusterIP)
+			log.Info("added target ip for trace", "service", service.Name, "ip", service.Spec.ClusterIP)
+		default:
+			return false, fmt.Errorf("invalid trace kind %s", trace.Kind)
+		}
+
+		tracePeriod, err := time.ParseDuration(trace.Period)
+		if err != nil {
+			return false, err
+		}
+		traceDelay, err := time.ParseDuration(trace.Delay)
+		if err != nil {
+			return false, err
+		}
+		traceExpiry, err := time.ParseDuration(trace.Expiry)
+		if err != nil {
+			return false, err
+		}
+
+		test, err := synthClient.CreateTest(ctx, &synthetics.Test{
+			Name: testName,
+			Type: synthetics.TestTypeIP,
+			Settings: &synthetics.TestSettings{
+				RollupLevel: 60,
+				Tasks:       []string{synthetics.TestTaskTrace},
+				Protocol:    synthetics.TestProtocolICMP,
+				Ping: &synthetics.PingTest{
+					Period: tracePeriod.Seconds(),
+					Count:  float64(trace.Count),
+					Delay:  traceDelay.Seconds(),
+				},
+				Trace: &synthetics.TraceTest{
+					Protocol: trace.Protocol,
+					Port:     trace.Port,
+					Period:   tracePeriod.Seconds(),
+					Count:    float64(trace.Count),
+					Limit:    float64(trace.Limit),
+					Delay:    traceDelay.Seconds(),
+					Expiry:   float64(traceExpiry.Milliseconds()),
+				},
+				IP: &synthetics.TestIP{
+					Targets: targetIPs,
+				},
+				AgentIDs: agentIDs,
+			},
+		})
+		if err != nil {
+			return false, err
+		}
+
+		if err := r.updateTaskTestIDs(ctx, task, test.ID); err != nil {
+			return false, err
+		}
+		log.Info("created trace test", "name", testName, "id", test.ID)
+	}
+
+	return created, nil
+}
+
+func (r *KentikReconciler) updateTaskTestIDs(ctx context.Context, task *syntheticsv1.SyntheticTask, testID string) error {
+
+	// update task annotations with test IDs
+	if task.Annotations == nil {
+		task.Annotations = map[string]string{}
+	}
+	v, _ := task.Annotations[taskAnnotationTestIDs]
+	testIDs := []string{}
+	if v != "" {
+		testIDs = strings.Split(v, ",")
+	}
+	testIDs = append(testIDs, testID)
+	task.Annotations[taskAnnotationTestIDs] = strings.Join(testIDs, ",")
+	if err := r.reconciler.Update(ctx, task); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func contains(list []string, s string) bool {

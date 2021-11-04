@@ -146,6 +146,7 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			if err := r.Update(ctx, &task); err != nil {
 				return ctrl.Result{}, err
 			}
+			return ctrl.Result{Requeue: true}, nil
 		}
 	} else { // deleted
 		log.Info("checking delete finalizer", "task", task.Name)
@@ -161,7 +162,6 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			log.Info("removed finalizer", "task", task.Name)
 			return ctrl.Result{Requeue: true}, nil
 		}
-		//return ctrl.Result{}, nil
 	}
 
 	return reconciler.Reconcile(ctx, req, &task)

@@ -31,17 +31,26 @@ import (
 const (
 	// Test Types
 	TestTypeURL = "url"
+	TestTypeIP  = "ip"
 	// Test Status
 	TestStatusActive = "TEST_STATUS_ACTIVE"
 	TestStatusPaused = "TEST_STATUS_PAUSED"
 	// Test Tasks
 	TestTaskHTTP  = "http"
-	TestTaskTrace = "trace"
+	TestTaskTrace = "traceroute"
 	TestTaskPing  = "ping"
 	// Test IP Family
 	TestIPFamilyV4   = "IP_FAMILY_V4"
 	TestIPFamilyV6   = "IP_FAMILY_V6"
 	TestIPFamilyDual = "IP_FAMILY_DUAL"
+	// Test Protocol
+	TestProtocolTCP  = "tcp"
+	TestProtocolUDP  = "udp"
+	TestProtocolICMP = "icmp"
+
+	// API minimum values
+	tracePeriodMinimum = 60
+	pingPeriodMinimum  = 60
 )
 
 type testCreateRequest struct {
@@ -141,20 +150,20 @@ type TestDNSGrid struct {
 }
 
 type PingTest struct {
-	Period int `json:"period"`
-	Count  int `json:"count"`
-	Expiry int `json:"expiry"`
-	Delay  int `json:"delay"`
+	Period float64 `json:"period"`
+	Count  float64 `json:"count"`
+	Expiry float64 `json:"expiry"`
+	Delay  float64 `json:"delay"`
 }
 
 type TraceTest struct {
-	Period   int    `json:"period"`
-	Count    int    `json:"count"`
-	Protocol string `json:"protocol"`
-	Port     int    `json:"port"`
-	Expiry   int    `json:"expiry"`
-	Limit    int    `json:"limit"`
-	Delay    int    `json:"delay"`
+	Period   float64 `json:"period"`
+	Count    float64 `json:"count"`
+	Protocol string  `json:"protocol"`
+	Port     int     `json:"port"`
+	Expiry   float64 `json:"expiry"`
+	Limit    float64 `json:"limit"`
+	Delay    float64 `json:"delay"`
 }
 
 type PageLoadTest struct {
@@ -171,22 +180,22 @@ type DNSTest struct {
 }
 
 type TestHealthSettings struct {
-	LatencyCritical           int   `json:"latencyCritical"`
-	LatencyWarning            int   `json:"latencyWarning"`
-	PacketLossCritical        int   `json:"packetLossCritical"`
-	PacketLossWarning         int   `json:"packetLossWarning"`
-	JitterCritical            int   `json:"jitterCritical"`
-	JitterWarning             int   `json:"jitterWarning"`
-	HTTPLatencyCritical       int   `json:"httpLatencyCritical"`
-	HTTPLatencyWarning        int   `json:"httpLatencyWarning"`
-	HTTPValidCodes            []int `json:"httpValidCodes"`
-	DNSValidCodes             []int `json:"dnsValidCodes"`
-	LatencyCriticalStdDev     int   `json:"latencyCriticalStddev"`
-	LatencyWarningStdDev      int   `json:"latencyWarningStddev"`
-	JitterCriticalStdDev      int   `json:"jitterCriticalStddev"`
-	JitterWarningStdDev       int   `json:"jitterWarningStddev"`
-	HTTPLatencyCriticalStdDev int   `json:"httpLatencyCriticalStddev"`
-	HTTPLatencyWarningStdDev  int   `json:"httpWarningCriticalStddev"`
+	LatencyCritical           float64 `json:"latencyCritical"`
+	LatencyWarning            float64 `json:"latencyWarning"`
+	PacketLossCritical        float64 `json:"packetLossCritical"`
+	PacketLossWarning         float64 `json:"packetLossWarning"`
+	JitterCritical            float64 `json:"jitterCritical"`
+	JitterWarning             float64 `json:"jitterWarning"`
+	HTTPLatencyCritical       float64 `json:"httpLatencyCritical"`
+	HTTPLatencyWarning        float64 `json:"httpLatencyWarning"`
+	HTTPValidCodes            []int   `json:"httpValidCodes"`
+	DNSValidCodes             []int   `json:"dnsValidCodes"`
+	LatencyCriticalStdDev     float64 `json:"latencyCriticalStddev"`
+	LatencyWarningStdDev      float64 `json:"latencyWarningStddev"`
+	JitterCriticalStdDev      float64 `json:"jitterCriticalStddev"`
+	JitterWarningStdDev       float64 `json:"jitterWarningStddev"`
+	HTTPLatencyCriticalStdDev float64 `json:"httpLatencyCriticalStddev"`
+	HTTPLatencyWarningStdDev  float64 `json:"httpWarningCriticalStddev"`
 }
 
 type TestMonitoringSettings struct {
@@ -255,8 +264,22 @@ func (c *Client) CreateTest(ctx context.Context, t *Test) (*Test, error) {
 			ActivationTimes:      "3",
 		}
 	}
+	if t.Settings.Ping == nil {
+		t.Settings.Ping = &PingTest{}
+	}
+	if t.Settings.Trace == nil {
+		t.Settings.Trace = &TraceTest{}
+	}
 	if t.Settings.Family == "" {
 		t.Settings.Family = TestIPFamilyV4
+	}
+	// set minimum defaults for Kentik API
+	if t.Settings.Ping != nil && t.Settings.Ping.Period < pingPeriodMinimum {
+		t.Settings.Ping.Period = pingPeriodMinimum
+	}
+	// set minimum defaults for Kentik API
+	if t.Settings.Trace != nil && t.Settings.Trace.Period < tracePeriodMinimum {
+		t.Settings.Trace.Period = tracePeriodMinimum
 	}
 
 	// serialize
@@ -274,9 +297,19 @@ func (c *Client) CreateTest(ctx context.Context, t *Test) (*Test, error) {
 			return nil, err
 		}
 		defer resp.Body.Close()
-		return nil, errors.Wrap(err, string(errData))
+		return nil, errors.New(string(errData))
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode > http.StatusOK {
+		errData, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		return nil, errors.New(string(errData))
+	}
 
 	var createResp testCreateResponse
 	if err := json.NewDecoder(resp.Body).Decode(&createResp); err != nil {

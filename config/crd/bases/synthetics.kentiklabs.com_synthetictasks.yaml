@@ -164,7 +164,7 @@ spec:
                       description: Name is the name of the k8s object to check
                       type: string
                     period:
-                      default: 10s
+                      default: 60s
                       description: Period is the interval for which the server to
                         run the check
                       type: string
