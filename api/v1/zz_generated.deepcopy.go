@@ -149,23 +149,47 @@ func (in *SyntheticTaskSpec) DeepCopyInto(out *SyntheticTaskSpec) {
 	}
 	if in.Fetch != nil {
 		in, out := &in.Fetch, &out.Fetch
-		*out = make([]Fetch, len(*in))
-		copy(*out, *in)
+		*out = make([]*Fetch, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(Fetch)
+				**out = **in
+			}
+		}
 	}
 	if in.TLSHandshake != nil {
 		in, out := &in.TLSHandshake, &out.TLSHandshake
-		*out = make([]TLSHandshake, len(*in))
-		copy(*out, *in)
+		*out = make([]*TLSHandshake, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(TLSHandshake)
+				**out = **in
+			}
+		}
 	}
 	if in.Trace != nil {
 		in, out := &in.Trace, &out.Trace
-		*out = make([]Trace, len(*in))
-		copy(*out, *in)
+		*out = make([]*Trace, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(Trace)
+				**out = **in
+			}
+		}
 	}
 	if in.Ping != nil {
 		in, out := &in.Ping, &out.Ping
-		*out = make([]Ping, len(*in))
-		copy(*out, *in)
+		*out = make([]*Ping, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(Ping)
+				**out = **in
+			}
+		}
 	}
 }
 

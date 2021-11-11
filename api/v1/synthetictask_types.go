@@ -33,6 +33,7 @@ type SyntheticTaskSpec struct {
 	// KentikRegion is the region to configure for sending data to Kentik
 	// +optional
 	// +kubebuilder:validation:Enum=us;eu;US;EU
+	// +kubebuilder:default=`US`
 	KentikRegion string `json:"kentik_region"`
 	// ServerImage is an optional override server image
 	// +optional
@@ -51,16 +52,16 @@ type SyntheticTaskSpec struct {
 	InfluxDB *InfluxDB `json:"influxdb,omitempty"`
 	// Fetch is a list of fetch checks
 	// +optional
-	Fetch []Fetch `json:"fetch,omitempty"`
+	Fetch []*Fetch `json:"fetch,omitempty"`
 	// TLSHandshake is a list of TLS Handshake checks
 	// +optional
-	TLSHandshake []TLSHandshake `json:"tls_handshake,omitempty"`
+	TLSHandshake []*TLSHandshake `json:"tls_handshake,omitempty"`
 	// Trace is a list of Trace checks
 	// +optional
-	Trace []Trace `json:"trace,omitempty"`
+	Trace []*Trace `json:"trace,omitempty"`
 	// Ping is a list of Ping checks
 	// +optional
-	Ping []Ping `json:"ping,omitempty"`
+	Ping []*Ping `json:"ping,omitempty"`
 }
 
 type InfluxDB struct {
