@@ -3,7 +3,7 @@ KentikLabs synthetic Kubernetes operator.  This operator can be used to create
 [Kentik synthetic tests](https://www.kentik.com/product/synthetics/) on a Kubernetes cluster.
 The data can then be viewed in the [Kentik Portal](https://www.kentik.com).
 
-![Odyssey Example](./hack/odyssey-example.portal.png)
+![Odyssey Example](/hack/odyssey-example.portal.png?raw=true)
 
 # Build
 To build the operator:
