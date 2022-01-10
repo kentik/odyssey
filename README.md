@@ -127,31 +127,3 @@ will be automatically resolved by the operator.
 | `period` | optional (default: `10s`) | Interval to perform check |
 | `delay` | optional (default: `0ms`) | Delay (in ms) before each check|
 | `expiry` | optional (default: `5s`) | Timeout for the check to complete|
-
-# InfluxDB
-By default the agent will report the results to `stdout` of the container. To have them
-sent to InfluxDB, use the following:
-
-```yaml
-apiVersion: synthetics.kentiklabs.com/v1
-kind: SyntheticTask
-metadata:
-  name: demo
-spec:
-  influxdb:
-    endpoint: "http://influx:8086/api/v2/write?bucket=default&org=system"
-    username: "admin"
-    password: "influxdb"
-    token: "secret-token"
-    organization: "system"
-    bucket: "default"
-```
-
-|Name      |Required  | Description|
-|----------|----------|----------|
-| Endpoint | yes | InfluxDB endpoint. Must include the `/api/<version>/` to determine version.|
-| Username | yes if no token | InfluxDB username|
-| Password | yes if no token | InfluxDB password|
-| Token | yes if no username/password | InfluxDB authentication token |
-| Organization | yes | InfluxDB organization to send data|
-| Bucket | yes | InfluxDB bucket to send data|
