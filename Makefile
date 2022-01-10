@@ -1,10 +1,12 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= kentik-odyssey-controller:latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
+# Your Kentik Account Email
 KENTIK_EMAIL ?=
+# Your Kentik API Token
 KENTIK_API_TOKEN ?=
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
@@ -67,7 +69,7 @@ build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./main.go -kentik-email "$(KENTIK_EMAIL)" -kentik-api-token "${KENTIK_API_TOKEN}"
+	@go run ./main.go -kentik-email "$(KENTIK_EMAIL)" -kentik-api-token "${KENTIK_API_TOKEN}"
 
 docker-build: test ## Build docker image with the manager.
 	docker build -t ${IMG} .

@@ -7,12 +7,6 @@ spec:
   agent_image: docker.io/kentik/ksynth:latest
   kentik_company: "CHANGEME"
   kentik_site: "CHANGEME"
-  trace:
-    - kind: deployment
-      name: demo
-      port: 0
-      period: 60s
-      expiry: 30s
   ping:
     - kind: deployment
       name: demo

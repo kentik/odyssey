@@ -18,7 +18,7 @@ This will build the protos and binary.
 To build and run the Go binary from your host outside of the cluster (for development):
 
 ```bash
-make install run
+make KENTIK_EMAIL=<your-kentik-email> KENTIK_API_TOKEN=<your-api-token> install run
 ```
 
 ## Image
