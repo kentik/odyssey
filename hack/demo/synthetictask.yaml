@@ -3,10 +3,10 @@ kind: SyntheticTask
 metadata:
   name: demo
 spec:
-  server_image: r.underland.io/kentik/synsrv:latest
-  agent_image: r.underland.io/kentik/ksynth:latest
-  kentik_company: "116465"
-  kentik_site: "10504"
+  server_image: docker.io/kentiklabs/synsrv:latest
+  agent_image: docker.io/kentik/ksynth:latest
+  kentik_company: "CHANGEME"
+  kentik_site: "CHANGEME"
   trace:
     - kind: deployment
       name: demo
@@ -27,38 +27,3 @@ spec:
       method: GET
       period: 10s
       expiry: 5s
-#  ping:
-#    - kind: service
-#      name: demo
-#      period: 10s
-#      count: 3
-#      delay: 0ms
-#      expiry: 2s
-#    - kind: service
-#      name: demo-new
-#      period: 10s
-#      count: 3
-#      delay: 0ms
-#      expiry: 2s
-#  fetch:
-#    - service: demo
-#      target: /
-#      port: 8080
-#      method: GET
-#      period: 10s
-#      expiry: 5s
-#    - service: demo-new
-#      target: /
-#      port: 8080
-#      method: GET
-#      period: 10s
-#      expiry: 5s
-#  #tls_handshake:
-#  #  - ingress: demo
-#  #    period: 30s
-#  #    expiry: 5s
-#  trace:
-#    - kind: deployment
-#      name: demo
-#      period: 30s
-#      expiry: 5s
