@@ -16,7 +16,7 @@ jobs:
 
       - name: Set Version
         run: |
-           echo VERSION=`date +"kt-%Y-%m-%d-${GITHUB_RUN_ID}-staging"` >> $GITHUB_ENV
+           echo VERSION=`date +"%Y-%m-%d-${GITHUB_RUN_ID}-staging"` >> $GITHUB_ENV
 
       - name: Setup Go
         uses: actions/setup-go@v2
