@@ -27,9 +27,16 @@ spec:
       containers:
       - command:
         - /manager
+        env:
+          - name: KENTIK_EMAIL
+            value: ""
+          - name: KENTIK_API_TOKEN
+            value: ""
         args:
         - --leader-elect
-        image: kentik-odyssey-controller:latest
+        - -kentik-email "$KENTIK_EMAIL"
+        - -kentik-api-token "$KENTIK_API_TOKEN"
+        image: docker.io/kentiklabs/odyssey-controller:latest
         name: manager
         securityContext:
           allowPrivilegeEscalation: false
