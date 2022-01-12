@@ -35,9 +35,11 @@ rules:
   resources:
   - pods
   verbs:
+  - create
   - delete
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - ""
@@ -57,6 +59,14 @@ rules:
   - pods/status
   verbs:
   - get
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - synthetics.kentiklabs.com
   resources:
