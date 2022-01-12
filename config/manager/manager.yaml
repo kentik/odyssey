@@ -29,9 +29,17 @@ spec:
         - /manager
         env:
           - name: KENTIK_EMAIL
-            value: ""
+            valueFrom:
+              secretKeyRef:
+                name: kentik
+                key: email
+                optional: true
           - name: KENTIK_API_TOKEN
-            value: ""
+            valueFrom:
+              secretKeyRef:
+                name: kentik
+                key: token
+                optional: true
         args:
         - --leader-elect
         - -kentik-email "$KENTIK_EMAIL"

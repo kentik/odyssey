@@ -59,8 +59,8 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&kentikEmail, "kentik-email", "", "The Kentik user email address for Kentik integration.")
-	flag.StringVar(&kentikAPIToken, "kentik-api-token", "", "The Kentik API token for Kentik integration.")
+	flag.StringVar(&kentikEmail, "kentik-email", os.Getenv("KENTIK_EMAIL"), "The Kentik user email address for Kentik integration.")
+	flag.StringVar(&kentikAPIToken, "kentik-api-token", os.Getenv("KENTIK_API_TOKEN"), "The Kentik API token for Kentik integration.")
 	opts := zap.Options{
 		Development: true,
 	}
