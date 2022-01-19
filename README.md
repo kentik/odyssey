@@ -32,8 +32,16 @@ docker build -t <name> .
 In order to see the task results in the Kentik Portal you will need to create a secret
 that contains your user account and [API Token](https://portal.kentik.com/v4/profile).
 
+Create the Odyssey namespace:
+
 ```
-kubectl create secret generic --from-literal=email=user@kentik.com --from-literal=token=1234567890 kentik
+kubectl create ns odyssey-system
+```
+
+Create the Secret:
+
+```
+kubectl -n odyssey-system create secret generic --from-literal=email=user@kentik.com --from-literal=token=1234567890 kentik
 ```
 
 Replace `user@kentik.com` and `1234567890` with your own email and token.
