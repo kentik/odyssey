@@ -69,6 +69,8 @@ kind: SyntheticTask
 metadata:
   name: demo
 spec:
+  kentik_company: "<your-company>"
+  kentik_site: "<your-site-id>"
   fetch:
     - service: demo
       target: /
