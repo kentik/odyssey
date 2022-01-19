@@ -1,0 +1,603 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: odyssey-system
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: synthetictasks.synthetics.kentiklabs.com
+spec:
+  group: synthetics.kentiklabs.com
+  names:
+    kind: SyntheticTask
+    listKind: SyntheticTaskList
+    plural: synthetictasks
+    singular: synthetictask
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: SyntheticTask is the Schema for the synthetictasks API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SyntheticTaskSpec defines the desired state of SyntheticTask
+            properties:
+              agent_command:
+                description: AgentCommand is an optional override command for the agent
+                items:
+                  type: string
+                type: array
+              agent_image:
+                description: AgentImage is an optional override agent image
+                type: string
+              fetch:
+                description: Fetch is a list of fetch checks
+                items:
+                  properties:
+                    expiry:
+                      default: 5s
+                      description: Expiry is the timeout for the check
+                      type: string
+                    method:
+                      default: get
+                      description: Method is the http method for the check
+                      enum:
+                      - get
+                      - head
+                      - post
+                      - GET
+                      - HEAD
+                      - POST
+                      type: string
+                    period:
+                      default: 10s
+                      description: Period is the interval for which the server to run the check
+                      type: string
+                    port:
+                      description: Port is the port to use for the check
+                      maximum: 65535
+                      minimum: 0
+                      type: integer
+                    service:
+                      description: Service is the name of the service for the check
+                      type: string
+                    target:
+                      description: Target is the target for the check
+                      type: string
+                    tls:
+                      description: TLS is a bool to use HTTPS for the check
+                      type: boolean
+                  required:
+                  - method
+                  - port
+                  - service
+                  - target
+                  type: object
+                type: array
+              influxdb:
+                description: InfluxDB is a remote InfluxDB service to receive agent metrics
+                properties:
+                  bucket:
+                    description: Bucket is the InfluxDB bucket
+                    type: string
+                  endpoint:
+                    description: Endpoint is the InfluxDB host
+                    type: string
+                  organization:
+                    description: Organization is the InfluxDB organization
+                    type: string
+                  password:
+                    description: Password is the auth password
+                    type: string
+                  token:
+                    description: Token is the auth token
+                    type: string
+                  username:
+                    description: Username is the auth username
+                    type: string
+                required:
+                - bucket
+                - endpoint
+                - organization
+                type: object
+              kentik_company:
+                description: KentikCompany is the company ID to send data to Kentik
+                type: string
+              kentik_region:
+                default: US
+                description: KentikRegion is the region to configure for sending data to Kentik
+                enum:
+                - us
+                - eu
+                - US
+                - EU
+                type: string
+              kentik_site:
+                description: KentikSite is the site ID to send data to Kentik
+                type: string
+              ping:
+                description: Ping is a list of Ping checks
+                items:
+                  properties:
+                    count:
+                      default: 3
+                      description: Count is the number of tries to use for the check
+                      maximum: 10
+                      minimum: 1
+                      type: integer
+                    delay:
+                      default: 0ms
+                      description: Delay is the duration to wait between checks
+                      pattern: ^[0-9]+ms
+                      type: string
+                    expiry:
+                      default: 2s
+                      description: Expiry is the timeout for the check
+                      type: string
+                    kind:
+                      description: Kind is the k8s object for the check
+                      enum:
+                      - deployment
+                      - pod
+                      - service
+                      - ingress
+                      type: string
+                    name:
+                      description: Name is the name of the k8s object to check
+                      type: string
+                    period:
+                      default: 60s
+                      description: Period is the interval for which the server to run the check
+                      type: string
+                  required:
+                  - kind
+                  - name
+                  type: object
+                type: array
+              server_command:
+                description: ServerCommand is an optional override command for the server
+                items:
+                  type: string
+                type: array
+              server_image:
+                description: ServerImage is an optional override server image
+                type: string
+              tls_handshake:
+                description: TLSHandshake is a list of TLS Handshake checks
+                items:
+                  properties:
+                    expiry:
+                      default: 5s
+                      description: Expiry is the timeout for the check
+                      type: string
+                    ingress:
+                      description: Ingress is the name of the ingress for the check
+                      type: string
+                    period:
+                      default: 10s
+                      description: Period is the interval for which the server to run the check
+                      type: string
+                    port:
+                      default: 443
+                      description: Port is the port to use for the check
+                      maximum: 65535
+                      minimum: 0
+                      type: integer
+                  required:
+                  - ingress
+                  type: object
+                type: array
+              trace:
+                description: Trace is a list of Trace checks
+                items:
+                  properties:
+                    count:
+                      default: 3
+                      description: Count is the number of tries to use for the check
+                      maximum: 10
+                      minimum: 1
+                      type: integer
+                    delay:
+                      default: 0ms
+                      description: Delay is the duration to wait between checks
+                      pattern: ^[0-9]+ms
+                      type: string
+                    expiry:
+                      default: 5s
+                      description: Expiry is the timeout for the check
+                      type: string
+                    kind:
+                      description: Kind is the k8s object for the check
+                      enum:
+                      - deployment
+                      - pod
+                      - service
+                      - ingress
+                      type: string
+                    limit:
+                      default: 3
+                      description: Limit is the maximum number of hops to use for the check
+                      maximum: 50
+                      minimum: 1
+                      type: integer
+                    name:
+                      description: Name is the name of the k8s object to check
+                      type: string
+                    period:
+                      default: 10s
+                      description: Period is the interval for which the server to run the check
+                      type: string
+                    port:
+                      default: 0
+                      description: Port is the port to use for the check
+                      maximum: 65535
+                      minimum: 0
+                      type: integer
+                    protocol:
+                      default: udp
+                      description: Protocol is the protocol to use in the check
+                      enum:
+                      - tcp
+                      - udp
+                      - icmp
+                      - TCP
+                      - UDP
+                      - ICMP
+                      type: string
+                  required:
+                  - kind
+                  - name
+                  type: object
+                type: array
+            type: object
+          status:
+            description: SyntheticTaskStatus defines the observed state of SyntheticTask
+            properties:
+              deploy_needed:
+                description: DeployNeeded indicates the server needs re-deployed for changes
+                type: boolean
+              update_id:
+                description: UpdateID is the current updateID for the server
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: odyssey-controller-manager
+  namespace: odyssey-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: odyssey-leader-election-role
+  namespace: odyssey-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: odyssey-manager-role
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - pods/log
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - pods/status
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - synthetics.kentiklabs.com
+  resources:
+  - synthetictasks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - synthetics.kentiklabs.com
+  resources:
+  - synthetictasks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - synthetics.kentiklabs.com
+  resources:
+  - synthetictasks/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: odyssey-metrics-reader
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: odyssey-proxy-role
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: odyssey-leader-election-rolebinding
+  namespace: odyssey-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: odyssey-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: odyssey-controller-manager
+  namespace: odyssey-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: odyssey-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: odyssey-manager-role
+subjects:
+- kind: ServiceAccount
+  name: odyssey-controller-manager
+  namespace: odyssey-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: odyssey-proxy-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: odyssey-proxy-role
+subjects:
+- kind: ServiceAccount
+  name: odyssey-controller-manager
+  namespace: odyssey-system
+---
+apiVersion: v1
+data:
+  controller_manager_config.yaml: |
+    apiVersion: controller-runtime.sigs.k8s.io/v1alpha1
+    kind: ControllerManagerConfig
+    health:
+      healthProbeBindAddress: :8081
+    metrics:
+      bindAddress: 127.0.0.1:8080
+    webhook:
+      port: 9443
+    leaderElection:
+      leaderElect: true
+      resourceName: 21e3fc81.kentiklabs.com
+kind: ConfigMap
+metadata:
+  name: odyssey-manager-config
+  namespace: odyssey-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: odyssey-controller-manager-metrics-service
+  namespace: odyssey-system
+spec:
+  ports:
+  - name: https
+    port: 8443
+    targetPort: https
+  selector:
+    control-plane: controller-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: odyssey-controller-manager
+  namespace: odyssey-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://127.0.0.1:8080/
+        - --logtostderr=true
+        - --v=10
+        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 8443
+          name: https
+      - args:
+        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=127.0.0.1:8080
+        - --leader-elect
+        command:
+        - /manager
+        env:
+        - name: KENTIK_EMAIL
+          valueFrom:
+            secretKeyRef:
+              key: email
+              name: kentik
+              optional: true
+        - name: KENTIK_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: token
+              name: kentik
+              optional: true
+        image: docker.io/kentiklabs/odyssey-controller:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 100m
+            memory: 30Mi
+          requests:
+            cpu: 100m
+            memory: 20Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: odyssey-controller-manager
+      terminationGracePeriodSeconds: 10

@@ -29,7 +29,24 @@ docker build -t <name> .
 ```
 
 # Deploy
-To deploy to a Kubernetes cluster:
+In order to see the task results in the Kentik Portal you will need to create a secret
+that contains your user account and [API Token](https://portal.kentik.com/v4/profile).
+
+```
+kubectl create secret generic --from-literal=email=user@kentik.com --from-literal=token=1234567890 kentik
+```
+
+Replace `user@kentik.com` and `1234567890` with your own email and token.
+
+## Option 1: Deploy using Kubernetes manifest
+To deploy using the latest manifest from `main`:
+
+```
+kubectl apply -f https://raw.githubusercontent.com/kentik/odyssey/main/deploy/odyssey.yaml
+```
+
+## Option 2: Deploy from Repository
+To deploy to a Kubernetes cluster using the repo:
 
 ```
 make IMG=<your-image> deploy
