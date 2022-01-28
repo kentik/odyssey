@@ -277,6 +277,8 @@ func (r *KentikReconciler) createFetchTasks(ctx context.Context, req ctrl.Reques
 		log.Info("building fetch configuration for service", "service", svc.Name)
 		scheme := "http"
 		if fetch.TLS {
+			log.Info("using tls for fetch service", "service", svc.Name)
+			log.Info("tls", "insecure", fetch.IgnoreTLSErrors)
 			scheme = "https"
 		}
 		serviceEndpoint := fmt.Sprintf("%s://%s.%s.svc.cluster.local:%d%s", scheme, svc.Name, task.Namespace, fetch.Port, fetch.Target)
@@ -290,6 +292,10 @@ func (r *KentikReconciler) createFetchTasks(ctx context.Context, req ctrl.Reques
 					Target: serviceEndpoint,
 				},
 				AgentIDs: agentIDs,
+				HTTP: &synthetics.TestHTTP{
+					Method:          fetch.Method,
+					IgnoreTLSErrors: fetch.IgnoreTLSErrors,
+				},
 			},
 		})
 		if err != nil {
