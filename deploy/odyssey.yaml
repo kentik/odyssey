@@ -53,6 +53,9 @@ spec:
                       default: 5s
                       description: Expiry is the timeout for the check
                       type: string
+                    ignoreTLSErrors:
+                      description: IgnoreTLSErrors is a bool to specify to ignore TLS errors
+                      type: boolean
                     method:
                       default: get
                       description: Method is the http method for the check

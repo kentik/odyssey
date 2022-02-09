@@ -62,6 +62,9 @@ type Fetch struct {
 	// +kubebuilder:default=`5s`
 	// +optional
 	Expiry string `json:"expiry"`
+	// IgnoreTLSErrors is a bool to specify to ignore TLS errors
+	// +optional
+	IgnoreTLSErrors bool `json:"ignoreTLSErrors"`
 }
 
 func (f *Fetch) ID() string {
