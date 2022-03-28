@@ -3,21 +3,30 @@ kind: SyntheticTask
 metadata:
   name: demo
 spec:
-  server_image: docker.io/kentiklabs/synsrv:latest
-  agent_image: docker.io/kentik/ksynth:latest
-  kentik_company: "CHANGEME"
-  kentik_site: "CHANGEME"
-  ping:
-    - kind: deployment
-      name: demo
-      period: 10s
-      count: 3
-      delay: 0ms
-      expiry: 2s
+  kentik_company: ""
+  kentik_site: ""
   fetch:
     - service: demo
       target: /
       port: 8080
       method: GET
-      period: 10s
+      period: 60s
+      expiry: 5s
+  ping:
+    - name: demo
+      kind: service
+      protocol: tcp
+      port: 8080
+      count: 1
+      period: 60s
+      expiry: 5s
+      timeout: 1000
+  trace:
+    - name: demo
+      kind: service
+      port: 8080
+      limit: 5
+      period: 60s
+      count: 1
+      timeout: 1000
       expiry: 5s

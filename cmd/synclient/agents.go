@@ -1,5 +1,5 @@
 /*
-Copyright 2021 KentikLabs
+Copyright 2022 KentikLabs
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -81,11 +81,15 @@ var agentsAuthorizeCommand = &cli.Command{
 	Name:  "authorize",
 	Usage: "authorize agent",
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
+		&cli.StringFlag{
 			Name:    "id",
 			Usage:   "agent id",
 			Aliases: []string{"i"},
-			Value:   &cli.StringSlice{},
+		},
+		&cli.StringFlag{
+			Name:    "name",
+			Usage:   "agent name",
+			Aliases: []string{"n"},
 		},
 		&cli.StringFlag{
 			Name:    "site-id",
@@ -97,17 +101,30 @@ var agentsAuthorizeCommand = &cli.Command{
 		client := getClient(clix)
 		ctx := context.Background()
 
+		id := clix.String("id")
+		if id == "" {
+			return fmt.Errorf("id must be specified")
+		}
+
+		name := clix.String("name")
+		if id == "" {
+			return fmt.Errorf("name must be specified")
+		}
+
 		siteID := clix.String("site-id")
 		if siteID == "" {
 			return fmt.Errorf("site-id must be specified")
 		}
 
-		for _, id := range clix.StringSlice("id") {
-			if err := client.AuthorizeAgent(ctx, id, siteID); err != nil {
-				return err
-			}
-			logrus.Infof("authorized %s", id)
+		siteName := clix.String("site-name")
+		if siteName == "" {
+			return fmt.Errorf("site-name must be specified")
 		}
+
+		if err := client.AuthorizeAgent(ctx, id, name, siteID); err != nil {
+			return err
+		}
+		logrus.Infof("authorized %s", id)
 
 		return nil
 	},

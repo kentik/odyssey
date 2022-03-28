@@ -1,5 +1,5 @@
 /*
-Copyright 2021 KentikLabs
+Copyright 2022 KentikLabs
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/go-logr/logr"
 )
 
 const (
-	defaultAPIEndpoint = "https://synthetics.api.kentik.com/synthetics/v202101beta1"
+	defaultAPIEndpoint = "https://grpc.api.kentik.com/synthetics/v202202"
 	headerAuthEmail    = "x-ch-auth-email"
 	headerAuthToken    = "x-ch-auth-api-token"
 )
@@ -33,14 +35,16 @@ type Client struct {
 	endpoint string
 	email    string
 	token    string
+	log      logr.Logger
 }
 
 // NewClient returns a new Sythentics API client
-func NewClient(email, token string) *Client {
+func NewClient(email, token string, log logr.Logger) *Client {
 	return &Client{
 		endpoint: defaultAPIEndpoint,
 		email:    email,
 		token:    token,
+		log:      log,
 	}
 }
 

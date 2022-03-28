@@ -138,7 +138,7 @@ spec:
                 items:
                   properties:
                     count:
-                      default: 3
+                      default: 1
                       description: Count is the number of tries to use for the check
                       maximum: 10
                       minimum: 1
@@ -167,9 +167,31 @@ spec:
                       default: 60s
                       description: Period is the interval for which the server to run the check
                       type: string
+                    port:
+                      default: 0
+                      description: Port is the port to use for the check
+                      maximum: 65535
+                      minimum: 0
+                      type: integer
+                    protocol:
+                      default: icmp
+                      description: Protocol is the protocol for the check
+                      enum:
+                      - icmp
+                      - tcp
+                      - udp
+                      type: string
+                    timeout:
+                      default: 1000
+                      description: Timeout is the timeout interval for the check
+                      maximum: 100000
+                      minimum: 1
+                      type: integer
                   required:
                   - kind
                   - name
+                  - protocol
+                  - timeout
                   type: object
                 type: array
               server_command:
@@ -251,20 +273,17 @@ spec:
                       maximum: 65535
                       minimum: 0
                       type: integer
-                    protocol:
-                      default: udp
-                      description: Protocol is the protocol to use in the check
-                      enum:
-                      - tcp
-                      - udp
-                      - icmp
-                      - TCP
-                      - UDP
-                      - ICMP
-                      type: string
+                    timeout:
+                      default: 1000
+                      description: Timeout is the timeout interval for the check
+                      maximum: 100000
+                      minimum: 1
+                      type: integer
                   required:
+                  - count
                   - kind
                   - name
+                  - timeout
                   type: object
                 type: array
             type: object

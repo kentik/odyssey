@@ -1,5 +1,5 @@
 /*
-Copyright 2021 KentikLabs
+Copyright 2022 KentikLabs
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,6 +49,7 @@ const (
 	TestProtocolICMP = "icmp"
 
 	// API minimum values
+	fetchPeriodMinimum = 60
 	tracePeriodMinimum = 60
 	pingPeriodMinimum  = 60
 )
@@ -74,41 +75,34 @@ type Test struct {
 	ID       string        `json:"id,omitempty"`
 	Name     string        `json:"name"`
 	Type     string        `json:"type"`
-	DeviceID string        `json:"deviceId"`
 	Status   string        `json:"status"`
 	Settings *TestSettings `json:"settings"`
 }
 
 type TestSettings struct {
-	Hostname           *TestHostname           `json:"hostname"`
-	IP                 *TestIP                 `json:"ip"`
-	Agent              *TestAgent              `json:"agent"`
-	Flow               *TestFlow               `json:"flow"`
-	Site               *TestSite               `json:"site"`
-	Tag                *TestTag                `json:"tag"`
-	DNS                *DNSTest                `json:"dns"`
-	URL                *URLTest                `json:"url"`
-	NetworkGrid        *TestNetworkGrid        `json:"networkGrid"`
-	PageLoad           *PageLoadTest           `json:"pageLoad"`
-	DNSGrid            *TestDNSGrid            `json:"dnsGrid"`
-	AgentIDs           []string                `json:"agentIds"`
-	Period             int                     `json:"period"`
-	Count              int                     `json:"count"`
-	Expiry             int                     `json:"expiry"`
-	Limit              int                     `json:"limit"`
-	Tasks              []string                `json:"tasks"`
-	HealthSettings     *TestHealthSettings     `json:"healthSettings"`
-	MonitoringSettings *TestMonitoringSettings `json:"monitoringSettings"`
-	Ping               *PingTest               `json:"ping"`
-	Trace              *TraceTest              `json:"trace"`
-	Port               int                     `json:"port"`
-	Protocol           string                  `json:"protocol"`
-	Family             string                  `json:"family"`
-	Servers            []string                `json:"servers"`
-	UseLocalIP         bool                    `json:"useLocalIp"`
-	Reciprocal         bool                    `json:"reciprocal"`
-	RollupLevel        int                     `json:"rollup_level"`
-	HTTP               *TestHTTP               `json:"http"`
+	Hostname       *TestHostname       `json:"hostname,omitempty"`
+	IP             *TestIP             `json:"ip,omitempty"`
+	Agent          *TestAgent          `json:"agent,omitempty"`
+	Flow           *TestFlow           `json:"flow,omitempty"`
+	Site           *TestSite           `json:"site,omitempty"`
+	Tag            *TestTag            `json:"tag,omitempty"`
+	DNS            *DNSTest            `json:"dns,omitempty"`
+	URL            *URLTest            `json:"url,omitempty"`
+	NetworkGrid    *TestNetworkGrid    `json:"networkGrid,omitempty"`
+	PageLoad       *PageLoadTest       `json:"pageLoad,omitempty"`
+	DNSGrid        *TestDNSGrid        `json:"dnsGrid,omitempty"`
+	AgentIDs       []string            `json:"agentIds,omitempty"`
+	Period         int                 `json:"period,omitempty"`
+	Tasks          []string            `json:"tasks,omitempty"`
+	HealthSettings *TestHealthSettings `json:"healthSettings,omitempty"`
+	Ping           *PingTest           `json:"ping,omitempty"`
+	Trace          *TraceTest          `json:"trace,omitempty"`
+	Port           int                 `json:"port,omitempty"`
+	Protocol       string              `json:"protocol,omitempty"`
+	Family         string              `json:"family,omitempty"`
+	Servers        []string            `json:"servers,omitempty"`
+	UseLocalIP     bool                `json:"useLocalIp,omitempty"`
+	Reciprocal     bool                `json:"reciprocal,omitempty"`
 }
 
 type TestHostname struct {
@@ -124,10 +118,10 @@ type TestAgent struct {
 }
 
 type TestFlow struct {
+	Type                    string `json:"type"`
 	Target                  string `json:"target"`
 	TargetRefreshIntervalMs int    `json:"targetRefreshIntervalMillis"`
 	MaxTasks                int    `json:"maxTasks"`
-	Type                    string `json:"type"`
 	InetDirection           string `json:"inetDirection"`
 	Direction               string `json:"direction"`
 }
@@ -150,70 +144,67 @@ type TestDNSGrid struct {
 }
 
 type PingTest struct {
-	Period float64 `json:"period"`
-	Count  float64 `json:"count"`
-	Expiry float64 `json:"expiry"`
-	Delay  float64 `json:"delay"`
+	Timeout  int    `json:"timeout"`
+	Count    int    `json:"count"`
+	Delay    int    `json:"delay"`
+	Protocol string `json:"protocol"`
+	Port     int    `json:"port"`
 }
 
 type TraceTest struct {
-	Period   float64 `json:"period"`
-	Count    float64 `json:"count"`
-	Protocol string  `json:"protocol"`
-	Port     int     `json:"port"`
-	Expiry   float64 `json:"expiry"`
-	Limit    float64 `json:"limit"`
-	Delay    float64 `json:"delay"`
+	Timeout  int    `json:"timeout"`
+	Count    int    `json:"count"`
+	Delay    int    `json:"delay"`
+	Protocol string `json:"protocol"`
+	Port     int    `json:"port"`
+	Limit    int    `json:"limit"`
 }
 
 type PageLoadTest struct {
-	Target string `json:"target"`
+	Target          string            `json:"target,omitempty"`
+	Timeout         float64           `json:"timeout"`
+	Headers         map[string]string `json:"headers,omitempty"`
+	CSSSelectors    map[string]string `json:"cssSelectors,omitempty"`
+	IgnoreTLSErrors bool              `json:"ignoreTlsErrors,omitempty"`
 }
 
 type URLTest struct {
-	Target string `json:"target"`
+	Target          string            `json:"target,omitempty"`
+	Timeout         float64           `json:"timeout"`
+	Method          string            `json:"method,omitempty"`
+	Headers         map[string]string `json:"headers,omitempty"`
+	Body            string            `json:"body,omitempty"`
+	CSSSelectors    map[string]string `json:"cssSelectors,omitempty"`
+	IgnoreTLSErrors bool              `json:"ignoreTlsErrors,omitempty"`
+	Expiry          int               `json:"expiry,omitempty"`
 }
 
 type DNSTest struct {
-	Target string `json:"target"`
-	Type   string `json:"type"`
+	Target  string   `json:"target,omitempty"`
+	Timeout float64  `json:"timeout"`
+	Type    string   `json:"type,omitempty"`
+	Servers []string `json:"servers,omitempty"`
+	Port    int      `json:"port,omitempty"`
 }
 
 type TestHealthSettings struct {
-	LatencyCritical           float64 `json:"latencyCritical"`
-	LatencyWarning            float64 `json:"latencyWarning"`
-	PacketLossCritical        float64 `json:"packetLossCritical"`
-	PacketLossWarning         float64 `json:"packetLossWarning"`
-	JitterCritical            float64 `json:"jitterCritical"`
-	JitterWarning             float64 `json:"jitterWarning"`
-	HTTPLatencyCritical       float64 `json:"httpLatencyCritical"`
-	HTTPLatencyWarning        float64 `json:"httpLatencyWarning"`
-	HTTPValidCodes            []int   `json:"httpValidCodes"`
-	DNSValidCodes             []int   `json:"dnsValidCodes"`
-	LatencyCriticalStdDev     float64 `json:"latencyCriticalStddev"`
-	LatencyWarningStdDev      float64 `json:"latencyWarningStddev"`
-	JitterCriticalStdDev      float64 `json:"jitterCriticalStddev"`
-	JitterWarningStdDev       float64 `json:"jitterWarningStddev"`
-	HTTPLatencyCriticalStdDev float64 `json:"httpLatencyCriticalStddev"`
-	HTTPLatencyWarningStdDev  float64 `json:"httpWarningCriticalStddev"`
-}
-
-type TestMonitoringSettings struct {
-	ActivationGracePeriod string   `json:"activationGracePeriod"`
-	ActivationTimeUnit    string   `json:"activationTimeUnit"`
-	ActivationTimeWindow  string   `json:"activationTimeWindow"`
-	ActivationTimes       string   `json:"activationTimes"`
-	NotificationChannels  []string `json:"notificationChannels"`
-}
-
-type TestHTTP struct {
-	Period          int               `json:"period"`
-	Expiry          int               `json:"expiry"`
-	Method          string            `json:"method"`
-	Headers         map[string]string `json:"headers"`
-	Body            string            `json:"body"`
-	IgnoreTLSErrors bool              `json:"ignoreTlsErrors"`
-	CSSSelectors    map[string]string `json:"cssSelectors"`
+	LatencyCritical           float64 `json:"latencyCritical,omitempty"`
+	LatencyWarning            float64 `json:"latencyWarning,omitempty"`
+	PacketLossCritical        float64 `json:"packetLossCritical,omitempty"`
+	PacketLossWarning         float64 `json:"packetLossWarning,omitempty"`
+	JitterCritical            float64 `json:"jitterCritical,omitempty"`
+	JitterWarning             float64 `json:"jitterWarning,omitempty"`
+	HTTPLatencyCritical       float64 `json:"httpLatencyCritical,omitempty"`
+	HTTPLatencyWarning        float64 `json:"httpLatencyWarning,omitempty"`
+	HTTPValidCodes            []int   `json:"httpValidCodes,omitempty"`
+	DNSValidCodes             []int   `json:"dnsValidCodes,omitempty"`
+	LatencyCriticalStdDev     float64 `json:"latencyCriticalStddev,omitempty"`
+	LatencyWarningStdDev      float64 `json:"latencyWarningStddev,omitempty"`
+	JitterCriticalStdDev      float64 `json:"jitterCriticalStddev,omitempty"`
+	JitterWarningStdDev       float64 `json:"jitterWarningStddev,omitempty"`
+	UnhealthySubtestThreshold float64 `json:"unhealthySubtestThreshold,omitempty"`
+	HTTPLatencyCriticalStdDev float64 `json:"httpLatencyCriticalStddev,omitempty"`
+	HTTPLatencyWarningStdDev  float64 `json:"httpWarningCriticalStddev,omitempty"`
 }
 
 func (c *Client) Tests(ctx context.Context) ([]*Test, error) {
@@ -238,10 +229,6 @@ func (c *Client) Tests(ctx context.Context) ([]*Test, error) {
 
 func (c *Client) CreateTest(ctx context.Context, t *Test) (*Test, error) {
 	// TODO: perhaps use a default and then merge with param?
-	// validation
-	if t.DeviceID == "" {
-		t.DeviceID = "0"
-	}
 	if t.Status == "" {
 		t.Status = TestStatusActive
 	}
@@ -251,35 +238,13 @@ func (c *Client) CreateTest(ctx context.Context, t *Test) (*Test, error) {
 	if t.Settings.Period == 0 {
 		t.Settings.Period = 60
 	}
-	if t.Settings.Expiry == 0 {
-		t.Settings.Expiry = 5000
-	}
 	if t.Settings.HealthSettings == nil {
-		t.Settings.HealthSettings = &TestHealthSettings{}
-	}
-	if t.Settings.MonitoringSettings == nil {
-		t.Settings.MonitoringSettings = &TestMonitoringSettings{
-			ActivationTimeUnit:   "seconds",
-			ActivationTimeWindow: "30",
-			ActivationTimes:      "3",
+		t.Settings.HealthSettings = &TestHealthSettings{
+			UnhealthySubtestThreshold: 5.0,
 		}
-	}
-	if t.Settings.Ping == nil {
-		t.Settings.Ping = &PingTest{}
-	}
-	if t.Settings.Trace == nil {
-		t.Settings.Trace = &TraceTest{}
 	}
 	if t.Settings.Family == "" {
 		t.Settings.Family = TestIPFamilyV4
-	}
-	// set minimum defaults for Kentik API
-	if t.Settings.Ping != nil && t.Settings.Ping.Period < pingPeriodMinimum {
-		t.Settings.Ping.Period = pingPeriodMinimum
-	}
-	// set minimum defaults for Kentik API
-	if t.Settings.Trace != nil && t.Settings.Trace.Period < tracePeriodMinimum {
-		t.Settings.Trace.Period = tracePeriodMinimum
 	}
 
 	// serialize
@@ -289,6 +254,9 @@ func (c *Client) CreateTest(ctx context.Context, t *Test) (*Test, error) {
 	}); err != nil {
 		return nil, err
 	}
+
+	// DEBUG
+	//fmt.Printf("%s\n", string(buf.Bytes()))
 
 	resp, err := c.request(ctx, http.MethodPost, "/tests", buf)
 	if err != nil {

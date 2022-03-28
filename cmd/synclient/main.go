@@ -1,5 +1,5 @@
 /*
-Copyright 2021 KentikLabs
+Copyright 2022 KentikLabs
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"github.com/kentik/odyssey/pkg/synthetics"
 	"github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 func main() {
@@ -62,5 +63,6 @@ func main() {
 }
 
 func getClient(clix *cli.Context) *synthetics.Client {
-	return synthetics.NewClient(clix.String("kentik-email"), clix.String("kentik-api-token"))
+	logger := zap.New()
+	return synthetics.NewClient(clix.String("kentik-email"), clix.String("kentik-api-token"), logger)
 }
