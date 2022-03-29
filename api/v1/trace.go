@@ -1,5 +1,5 @@
 /*
-Copyright 2021 KentikLabs
+Copyright 2022 KentikLabs
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,11 +46,6 @@ type Trace struct {
 	// Name is the name of the k8s object to check
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
-	// Protocol is the protocol to use in the check
-	// +kubebuilder:validation:Enum=tcp;udp;icmp;TCP;UDP;ICMP
-	// +kubebuilder:default=udp
-	// +optional
-	Protocol string `json:"protocol"`
 	// Port is the port to use for the check
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=65535
@@ -61,8 +56,12 @@ type Trace struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=10
 	// +kubebuilder:default=3
-	// +optional
 	Count int `json:"count"`
+	// Timeout is the timeout interval for the check
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100000
+	// +kubebuilder:default=1000
+	Timeout int `json:"timeout"`
 	// Limit is the maximum number of hops to use for the check
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=50
@@ -83,6 +82,9 @@ type Trace struct {
 	// +optional
 	Expiry string `json:"expiry"`
 
+	// Protocol is used in the yaml definition but not exposed to the user
+	// +optional
+	Protocol string `json:"-"`
 	// Target is used in the yaml definition but not exposed to the user
 	// +optional
 	Target string `json:"-"`

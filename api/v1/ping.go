@@ -1,5 +1,5 @@
 /*
-Copyright 2021 KentikLabs
+Copyright 2022 KentikLabs
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ const (
       count: {{.Count}}
       period: {{.Period}}
       delay: {{.Delay}}
+      protocol: {{.Protocol}}
+      port: {{.Port}}
       expiry: {{.Expiry}}
     ipv4: true
     ipv6: false
@@ -43,12 +45,28 @@ type Ping struct {
 	// Name is the name of the k8s object to check
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
+	// Protocol is the protocol for the check
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum=icmp;tcp;udp
+	// +kubebuilder:default=icmp
+	Protocol string `json:"protocol"`
+	// Port is the port to use for the check
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:default=0
+	// +optional
+	Port int `json:"port"`
 	// Count is the number of tries to use for the check
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=10
-	// +kubebuilder:default=3
+	// +kubebuilder:default=1
 	// +optional
 	Count int `json:"count"`
+	// Timeout is the timeout interval for the check
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100000
+	// +kubebuilder:default=1000
+	Timeout int `json:"timeout"`
 	// Period is the interval for which the server to run the check
 	// +kubebuilder:default=`60s`
 	// +optional
@@ -69,7 +87,7 @@ type Ping struct {
 }
 
 func (p *Ping) ID() string {
-	return fmt.Sprintf("%s-%s-%d", p.Kind, p.Name, p.Count)
+	return fmt.Sprintf("%s-%s-%s", p.Kind, p.Name, p.Protocol)
 }
 
 func (p *Ping) Yaml() (string, error) {

@@ -1,5 +1,5 @@
 /*
-Copyright 2021 KentikLabs
+Copyright 2022 KentikLabs
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import (
 const (
 	// Agent Status
 	AgentStatusOK = "AGENT_STATUS_OK"
+	IPFamilyV4    = "IP_FAMILY_V4"
 )
 
 var (
@@ -42,24 +43,27 @@ type agentResponse struct {
 }
 
 type authorizeAgent struct {
-	Status string `json:"status"`
-	SiteID string `json:"siteId"`
+	Alias    string `json:"alias"`
+	Family   string `json:"family"`
+	Status   string `json:"status"`
+	SiteID   string `json:"siteId"`
+	SiteName string `json:"siteName"`
 }
 type agentAuthorizeRequest struct {
 	Agent *authorizeAgent `json:"agent"`
-	Mask  string          `json:"mask"`
 }
 
 type Agent struct {
-	ID      string `json:"id,omitempty"`
-	Name    string `json:"name,omitempty"`
-	Status  string `json:"status,omitempty"`
-	Alias   string `json:"alias,omitempty"`
-	Type    string `json:"type,omitempty"`
-	OS      string `json:"os,omitempty"`
-	IP      string `json:"ip,omitempty"`
-	SiteID  string `json:"siteId,omitempty"`
-	Version string `json:"version,omitempty"`
+	ID       string `json:"id,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Status   string `json:"status,omitempty"`
+	Alias    string `json:"alias,omitempty"`
+	Type     string `json:"type,omitempty"`
+	OS       string `json:"os,omitempty"`
+	IP       string `json:"ip,omitempty"`
+	SiteID   string `json:"site_id,omitempty"`
+	SiteName string `json:"site_name,omitempty"`
+	Version  string `json:"version,omitempty"`
 }
 
 func (c *Client) Agents(ctx context.Context) ([]*Agent, error) {
@@ -97,19 +101,21 @@ func (c *Client) GetAgent(ctx context.Context, name string) (*Agent, error) {
 	return nil, errors.Wrap(ErrAgentNotFound, name)
 }
 
-func (c *Client) AuthorizeAgent(ctx context.Context, agentID, siteID string) error {
+func (c *Client) AuthorizeAgent(ctx context.Context, agentID, agentName, siteID string) error {
 	buf := &bytes.Buffer{}
 	if err := json.NewEncoder(buf).Encode(agentAuthorizeRequest{
 		Agent: &authorizeAgent{
+			Alias:  agentName,
+			Family: IPFamilyV4,
 			Status: AgentStatusOK,
 			SiteID: siteID,
 		},
-		Mask: "agent.status",
 	}); err != nil {
 		return err
 	}
 
-	if resp, err := c.request(ctx, http.MethodPatch, fmt.Sprintf("/agents/%s", agentID), buf); err != nil {
+	resp, err := c.request(ctx, http.MethodPut, fmt.Sprintf("/agents/%s", agentID), buf)
+	if err != nil {
 		errData, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
@@ -118,6 +124,8 @@ func (c *Client) AuthorizeAgent(ctx context.Context, agentID, siteID string) err
 
 		return errors.New(string(errData))
 	}
+
+	defer resp.Body.Close()
 
 	return nil
 }

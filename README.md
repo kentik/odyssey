@@ -67,25 +67,34 @@ To create and deploy a synth server to run tests, use the following example:
 apiVersion: synthetics.kentiklabs.com/v1
 kind: SyntheticTask
 metadata:
-  name: demo
+  name: myservice-synth
 spec:
   kentik_company: "<your-company>"
   kentik_site: "<your-site-id>"
   fetch:
-    - service: demo
+    - service: myservice
       target: /
       port: 8080
       method: GET
-      period: 30s
+      period: 60s
       expiry: 5s
-  tls_handshake:
-    - ingress: demo
-      period: 30s
+  ping:
+    - name: myservice
+      kind: service
+      protocol: tcp
+      port: 8080
+      count: 1
+      period: 60s
       expiry: 5s
+      timeout: 1000
   trace:
-    - kind: deployment
-      name: demo
-      period: 30s
+    - name: myservice
+      kind: service
+      port: 8080
+      limit: 5
+      period: 60s
+      count: 1
+      timeout: 1000
       expiry: 5s
 ```
 
@@ -93,7 +102,7 @@ spec:
 default images for the components.  This is useful for development.
 
 This will inform the operator to launch a synth server and agent in the desired namespace
-and configure the server with three tasks (`fetch`, `tls_handshake`, `ping`, and `trace`). These
+and configure the server with three tasks (`fetch`, `ping`, and `trace`). These
 will then be sent to the agent to perform at the specified intervals.
 
 # Tasks
@@ -112,17 +121,7 @@ info (IP, etc) will be automatically resolved by the operator.
 | `method` | optional (default: `GET`) | HTTP method to use for check |
 | `period` | optional (default: `10s`) | Interval to perform check |
 | `expiry` | optional (default: `5s`) | Timeout for the check to complete|
-
-## TLS Handshake
-The `tls_handshake` test performs a TLS handshake and reports info. This check requires
-a Kubernetes Ingress object. The connection info will be automatically resolved by the operator.
-
-|Name      |Required  | Description|
-|----------|----------|----------|
-| `ingress` | yes | Name of the Kubernetes ingress|
-| `port` | optional (default: `443`) | Port to check|
-| `period` | optional (default: `10s`) | Interval to perform check |
-| `expiry` | optional (default: `5s`) | Timeout for the check to complete|
+| `ignoreTLSErrors` | optional (default: `false`) | Ignore TLS errors on request |
 
 ## Ping
 Ping performs a network ping and latency, etc. This check can be used
@@ -133,8 +132,11 @@ will be automatically resolved by the operator.
 |----------|----------|----------|
 | `kind` | yes | Kubernetes object to check (`Deployment`, `Pod`, `Service`, `Ingress`)|
 | `name` | yes | Name of the object to check |
-| `count` | optional (default: `3`) | Number of tries for the check|
-| `period` | optional (default: `10s`) | Interval to perform check |
+| `protocol` | optional (default: `icmp`) | Protocol to use in the check (`icmp`, `tcp`, `udp`)|
+| `port` | optional (default: `0`) | Port to use for the check|
+| `count` | optional (default: `1`) | Number of tries for the check|
+| `timeout` | yes (default: `1000`) | Timeout (in ms) for the check|
+| `period` | optional (default: `60s`) | Interval to perform check |
 | `delay` | optional (default: `0ms`) | Delay (in ms) before each check|
 | `expiry` | optional (default: `5s`) | Timeout for the check to complete|
 
@@ -150,6 +152,7 @@ will be automatically resolved by the operator.
 | `protocol` | optional (default: `udp`) | Protocol to use for the trace |
 | `port` | optional (default: `0`) | Port to check|
 | `count` | optional (default: `3`) | Number of tries for the check|
+| `timeout` | yes (default: `1000`) | Timeout (in ms) for the check|
 | `limit` | optional (default: `3` min: `1` max: `50`) | Maximum number of hops|
 | `period` | optional (default: `10s`) | Interval to perform check |
 | `delay` | optional (default: `0ms`) | Delay (in ms) before each check|

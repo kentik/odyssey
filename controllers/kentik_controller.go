@@ -1,5 +1,5 @@
 /*
-Copyright 2021 KentikLabs
+Copyright 2022 KentikLabs
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -90,7 +90,7 @@ func (r *KentikReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken)
+	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken, r.reconciler.Log)
 
 	// finalizers
 	for _, pod := range agentPods {
@@ -122,7 +122,7 @@ func (r *KentikReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 			// TODO: check if already authorized and skip
 
 			// auth agent id with site
-			if err := synthClient.AuthorizeAgent(ctx, agent.ID, task.Spec.KentikSite); err != nil {
+			if err := synthClient.AuthorizeAgent(ctx, agent.ID, pod.Name, task.Spec.KentikSite); err != nil {
 				return ctrl.Result{}, err
 			}
 			if pod.Annotations == nil {
@@ -194,7 +194,7 @@ func (r *KentikReconciler) Cleanup(ctx context.Context, req ctrl.Request, task *
 		return err
 	}
 
-	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken)
+	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken, r.reconciler.Log)
 	for _, pod := range agentPods {
 		log.Info("checking delete pod finalizer", "pod", pod.Name)
 		if contains(pod.GetFinalizers(), finalizerName) {
@@ -235,7 +235,7 @@ func (r *KentikReconciler) Cleanup(ctx context.Context, req ctrl.Request, task *
 func (r *KentikReconciler) createFetchTasks(ctx context.Context, req ctrl.Request, task *syntheticsv1.SyntheticTask, agentPods []corev1.Pod) (bool, error) {
 	log := r.reconciler.Log.WithValues("name", req.NamespacedName, "namespace", req.Namespace, "controller", "kentik")
 
-	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken)
+	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken, r.reconciler.Log)
 	// TODO: get all Kentik Tests and check if already created
 
 	tests, err := synthClient.Tests(ctx)
@@ -282,20 +282,24 @@ func (r *KentikReconciler) createFetchTasks(ctx context.Context, req ctrl.Reques
 			scheme = "https"
 		}
 		serviceEndpoint := fmt.Sprintf("%s://%s.%s.svc.cluster.local:%d%s", scheme, svc.Name, task.Namespace, fetch.Port, fetch.Target)
+		testInterval, err := time.ParseDuration(fetch.Period)
+		if err != nil {
+			return false, err
+		}
 		test, err := synthClient.CreateTest(ctx, &synthetics.Test{
 			Name: testName,
 			Type: synthetics.TestTypeURL,
 			Settings: &synthetics.TestSettings{
-				RollupLevel: 60,
-				Tasks:       []string{synthetics.TestTaskHTTP},
+				Period: int(testInterval.Seconds()),
+				//RollupLevel: 60,
+				Tasks: []string{synthetics.TestTaskHTTP},
 				URL: &synthetics.URLTest{
-					Target: serviceEndpoint,
-				},
-				AgentIDs: agentIDs,
-				HTTP: &synthetics.TestHTTP{
+					Target:          serviceEndpoint,
 					Method:          fetch.Method,
 					IgnoreTLSErrors: fetch.IgnoreTLSErrors,
+					Timeout:         5000,
 				},
+				AgentIDs: agentIDs,
 			},
 		})
 		if err != nil {
@@ -314,7 +318,7 @@ func (r *KentikReconciler) createFetchTasks(ctx context.Context, req ctrl.Reques
 func (r *KentikReconciler) createPingTasks(ctx context.Context, req ctrl.Request, task *syntheticsv1.SyntheticTask, agentPods []corev1.Pod) (bool, error) {
 	log := r.reconciler.Log.WithValues("name", req.NamespacedName, "namespace", req.Namespace, "controller", "kentik")
 
-	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken)
+	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken, r.reconciler.Log)
 
 	tests, err := synthClient.Tests(ctx)
 	if err != nil {
@@ -408,30 +412,31 @@ func (r *KentikReconciler) createPingTasks(ctx context.Context, req ctrl.Request
 		if err != nil {
 			return false, err
 		}
-		pingExpiry, err := time.ParseDuration(ping.Expiry)
-		if err != nil {
-			return false, err
+
+		if ping.Count <= 0 {
+			ping.Count = 1
 		}
 
 		test, err := synthClient.CreateTest(ctx, &synthetics.Test{
 			Name: testName,
 			Type: synthetics.TestTypeIP,
 			Settings: &synthetics.TestSettings{
-				RollupLevel: 60,
-				Tasks:       []string{synthetics.TestTaskPing},
-				Protocol:    synthetics.TestProtocolICMP,
+				Period: int(pingPeriod.Seconds()),
+				Tasks:  []string{synthetics.TestTaskPing},
 				Ping: &synthetics.PingTest{
-					Period: pingPeriod.Seconds(),
-					Count:  float64(ping.Count),
-					Delay:  pingDelay.Seconds(),
-					Expiry: float64(pingExpiry.Milliseconds()),
+					Protocol: ping.Protocol,
+					Port:     ping.Port,
+					Count:    ping.Count,
+					Delay:    int(pingDelay.Milliseconds()),
+					Timeout:  ping.Timeout,
 				},
 				Trace: &synthetics.TraceTest{
-					Protocol: synthetics.TestProtocolUDP,
-					Period:   pingPeriod.Seconds(),
-					Count:    float64(ping.Count),
-					Delay:    pingDelay.Seconds(),
-					Expiry:   float64(pingExpiry.Milliseconds()),
+					Protocol: ping.Protocol,
+					Port:     ping.Port,
+					Count:    ping.Count,
+					Delay:    int(pingDelay.Milliseconds()),
+					Limit:    5,
+					Timeout:  ping.Timeout,
 				},
 				IP: &synthetics.TestIP{
 					Targets: targetIPs,
@@ -455,7 +460,7 @@ func (r *KentikReconciler) createPingTasks(ctx context.Context, req ctrl.Request
 func (r *KentikReconciler) createTraceTasks(ctx context.Context, req ctrl.Request, task *syntheticsv1.SyntheticTask, agentPods []corev1.Pod) (bool, error) {
 	log := r.reconciler.Log.WithValues("name", req.NamespacedName, "namespace", req.Namespace, "controller", "kentik")
 
-	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken)
+	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken, r.reconciler.Log)
 
 	tests, err := synthClient.Tests(ctx)
 	if err != nil {
@@ -480,6 +485,7 @@ func (r *KentikReconciler) createTraceTasks(ctx context.Context, req ctrl.Reques
 	// trace
 	created := false
 	for _, trace := range task.Spec.Trace {
+		log.Info("trace task", "trace", fmt.Sprintf("%+v", trace))
 		// create test per agent
 		testName := fmt.Sprintf("%s/trace-%s", task.Namespace, trace.Name)
 		if _, exists := testLookup[testName]; exists {
@@ -541,15 +547,7 @@ func (r *KentikReconciler) createTraceTasks(ctx context.Context, req ctrl.Reques
 			return false, fmt.Errorf("invalid trace kind %s", trace.Kind)
 		}
 
-		tracePeriod, err := time.ParseDuration(trace.Period)
-		if err != nil {
-			return false, err
-		}
 		traceDelay, err := time.ParseDuration(trace.Delay)
-		if err != nil {
-			return false, err
-		}
-		traceExpiry, err := time.ParseDuration(trace.Expiry)
 		if err != nil {
 			return false, err
 		}
@@ -558,22 +556,24 @@ func (r *KentikReconciler) createTraceTasks(ctx context.Context, req ctrl.Reques
 			Name: testName,
 			Type: synthetics.TestTypeIP,
 			Settings: &synthetics.TestSettings{
-				RollupLevel: 60,
-				Tasks:       []string{synthetics.TestTaskTrace},
-				Protocol:    synthetics.TestProtocolICMP,
+				Tasks: []string{
+					synthetics.TestTaskPing,
+					synthetics.TestTaskTrace,
+				},
 				Ping: &synthetics.PingTest{
-					Period: tracePeriod.Seconds(),
-					Count:  float64(trace.Count),
-					Delay:  traceDelay.Seconds(),
+					Protocol: synthetics.TestProtocolTCP,
+					Port:     trace.Port,
+					Count:    trace.Count,
+					Delay:    int(traceDelay.Milliseconds()),
+					Timeout:  trace.Timeout,
 				},
 				Trace: &synthetics.TraceTest{
-					Protocol: trace.Protocol,
+					Protocol: synthetics.TestProtocolTCP,
 					Port:     trace.Port,
-					Period:   tracePeriod.Seconds(),
-					Count:    float64(trace.Count),
-					Limit:    float64(trace.Limit),
-					Delay:    traceDelay.Seconds(),
-					Expiry:   float64(traceExpiry.Milliseconds()),
+					Count:    trace.Count,
+					Limit:    trace.Limit,
+					Delay:    int(traceDelay.Milliseconds()),
+					Timeout:  trace.Timeout,
 				},
 				IP: &synthetics.TestIP{
 					Targets: targetIPs,

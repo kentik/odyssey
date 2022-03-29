@@ -1,5 +1,5 @@
 /*
-Copyright 2021 KentikLabs
+Copyright 2022 KentikLabs
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,13 +59,12 @@ var testsListCommand = &cli.Command{
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 8, 1, 3, ' ', 0)
-		fmt.Fprintf(w, "ID\tNAME\tTYPE\tSTATUS\n")
+		fmt.Fprintf(w, "ID\tNAME\tTYPE\n")
 		for _, test := range tests {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+			fmt.Fprintf(w, "%s\t%s\t%s\n",
 				test.ID,
 				test.Name,
 				test.Type,
-				test.Status,
 			)
 		}
 		w.Flush()

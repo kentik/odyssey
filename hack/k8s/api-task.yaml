@@ -1,0 +1,16 @@
+apiVersion: synthetics.kentiklabs.com/v1
+kind: SyntheticTask
+metadata:
+  name: kubernetes
+spec:
+  kentik_company: ""
+  kentik_site: ""
+  fetch:
+    - service: kubernetes
+      target: /healthz
+      port: 443
+      tls: true
+      method: GET
+      period: 60s
+      expiry: 5s
+      ignoreTLSErrors: true
