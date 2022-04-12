@@ -55,7 +55,7 @@ type Fetch struct {
 	// +kubebuilder:validation:Required
 	Method string `json:"method"`
 	// Period is the interval for which the server to run the check
-	// +kubebuilder:default=`10s`
+	// +kubebuilder:default=`60s`
 	// +optional
 	Period string `json:"period"`
 	// Expiry is the timeout for the check

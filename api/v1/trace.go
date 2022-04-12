@@ -69,7 +69,7 @@ type Trace struct {
 	// +optional
 	Limit int `json:"limit"`
 	// Period is the interval for which the server to run the check
-	// +kubebuilder:default=`10s`
+	// +kubebuilder:default=`60s`
 	// +optional
 	Period string `json:"period"`
 	// Delay is the duration to wait between checks
