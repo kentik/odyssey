@@ -28,7 +28,15 @@ To build a Docker image of the controller:
 docker build -t <name> .
 ```
 
-# Deploy
+# Deployment
+Use the following to deploy the Odyssey operator.
+
+## Kentik API Access
+You will need to add an ACL for your subnet where Odyssey is running. This is to allow
+Odyssey to query site and company information for the tasks. To add an ACL for Odyssey
+visit your [Portal Settings](https://portal.kentik.com/v4/settings/access).
+
+## Deploy Odyssey
 In order to see the task results in the Kentik Portal you will need to create a secret
 that contains your user account and [API Token](https://portal.kentik.com/v4/profile).
 
