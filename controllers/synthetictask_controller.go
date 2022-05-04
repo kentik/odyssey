@@ -94,6 +94,7 @@ type SyntheticTaskReconciler struct {
 	KentikAPIToken string
 	tasks          map[string]interface{}
 	updateCh       chan *updateConfig
+	kentikCompany  string
 }
 
 type Reconciler interface {
@@ -129,7 +130,7 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// default to synsrv
 	reconciler = NewSynSrvReconciler(r)
 	// check for Kentik
-	if task.Spec.KentikCompany != "" && task.Spec.KentikSite != "" {
+	if task.Spec.KentikSite != "" {
 		// check for valid controller config
 		if r.KentikEmail == "" || r.KentikAPIToken == "" {
 			return ctrl.Result{}, fmt.Errorf("kentik-email and kentik-api-token must be specified on the controller in order to process kentik integrated tasks")

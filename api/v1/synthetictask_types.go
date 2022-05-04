@@ -24,10 +24,7 @@ import (
 
 // SyntheticTaskSpec defines the desired state of SyntheticTask
 type SyntheticTaskSpec struct {
-	// KentikCompany is the company ID to send data to Kentik
-	// +optional
-	KentikCompany string `json:"kentik_company"`
-	// KentikSite is the site ID to send data to Kentik
+	// KentikSite is the site name to send data to Kentik
 	// +optional
 	KentikSite string `json:"kentik_site"`
 	// KentikRegion is the region to configure for sending data to Kentik

@@ -62,7 +62,10 @@ func (r *KentikReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 				tld = "eu"
 			}
 			serverEndpoint := fmt.Sprintf("https://api.kentik.%s", tld)
-			deployment := r.reconciler.getAgentDeployment(task, serverEndpoint)
+			deployment, err := r.reconciler.getAgentDeployment(task, serverEndpoint)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
 			ctrl.SetControllerReference(task, deployment, r.reconciler.Scheme)
 			if err := r.reconciler.Create(ctx, deployment); err != nil {
 				return ctrl.Result{}, err
