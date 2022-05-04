@@ -9,7 +9,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.4.1
+    controller-gen.kubebuilder.io/version: (devel)
   creationTimestamp: null
   name: synthetictasks.synthetics.kentiklabs.com
 spec:
@@ -27,10 +27,14 @@ spec:
         description: SyntheticTask is the Schema for the synthetictasks API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
             type: string
           metadata:
             type: object
@@ -38,7 +42,8 @@ spec:
             description: SyntheticTaskSpec defines the desired state of SyntheticTask
             properties:
               agent_command:
-                description: AgentCommand is an optional override command for the agent
+                description: AgentCommand is an optional override command for the
+                  agent
                 items:
                   type: string
                 type: array
@@ -54,7 +59,8 @@ spec:
                       description: Expiry is the timeout for the check
                       type: string
                     ignoreTLSErrors:
-                      description: IgnoreTLSErrors is a bool to specify to ignore TLS errors
+                      description: IgnoreTLSErrors is a bool to specify to ignore
+                        TLS errors
                       type: boolean
                     method:
                       default: get
@@ -68,8 +74,9 @@ spec:
                       - POST
                       type: string
                     period:
-                      default: 10s
-                      description: Period is the interval for which the server to run the check
+                      default: 60s
+                      description: Period is the interval for which the server to
+                        run the check
                       type: string
                     port:
                       description: Port is the port to use for the check
@@ -93,7 +100,8 @@ spec:
                   type: object
                 type: array
               influxdb:
-                description: InfluxDB is a remote InfluxDB service to receive agent metrics
+                description: InfluxDB is a remote InfluxDB service to receive agent
+                  metrics
                 properties:
                   bucket:
                     description: Bucket is the InfluxDB bucket
@@ -118,12 +126,10 @@ spec:
                 - endpoint
                 - organization
                 type: object
-              kentik_company:
-                description: KentikCompany is the company ID to send data to Kentik
-                type: string
               kentik_region:
                 default: US
-                description: KentikRegion is the region to configure for sending data to Kentik
+                description: KentikRegion is the region to configure for sending data
+                  to Kentik
                 enum:
                 - us
                 - eu
@@ -131,7 +137,7 @@ spec:
                 - EU
                 type: string
               kentik_site:
-                description: KentikSite is the site ID to send data to Kentik
+                description: KentikSite is the site name to send data to Kentik
                 type: string
               ping:
                 description: Ping is a list of Ping checks
@@ -165,7 +171,8 @@ spec:
                       type: string
                     period:
                       default: 60s
-                      description: Period is the interval for which the server to run the check
+                      description: Period is the interval for which the server to
+                        run the check
                       type: string
                     port:
                       default: 0
@@ -195,7 +202,8 @@ spec:
                   type: object
                 type: array
               server_command:
-                description: ServerCommand is an optional override command for the server
+                description: ServerCommand is an optional override command for the
+                  server
                 items:
                   type: string
                 type: array
@@ -215,7 +223,8 @@ spec:
                       type: string
                     period:
                       default: 10s
-                      description: Period is the interval for which the server to run the check
+                      description: Period is the interval for which the server to
+                        run the check
                       type: string
                     port:
                       default: 443
@@ -256,7 +265,8 @@ spec:
                       type: string
                     limit:
                       default: 3
-                      description: Limit is the maximum number of hops to use for the check
+                      description: Limit is the maximum number of hops to use for
+                        the check
                       maximum: 50
                       minimum: 1
                       type: integer
@@ -264,8 +274,9 @@ spec:
                       description: Name is the name of the k8s object to check
                       type: string
                     period:
-                      default: 10s
-                      description: Period is the interval for which the server to run the check
+                      default: 60s
+                      description: Period is the interval for which the server to
+                        run the check
                       type: string
                     port:
                       default: 0
@@ -291,7 +302,8 @@ spec:
             description: SyntheticTaskStatus defines the observed state of SyntheticTask
             properties:
               deploy_needed:
-                description: DeployNeeded indicates the server needs re-deployed for changes
+                description: DeployNeeded indicates the server needs re-deployed for
+                  changes
                 type: boolean
               update_id:
                 description: UpdateID is the current updateID for the server
