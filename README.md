@@ -61,7 +61,8 @@ make IMG=<your-image> deploy
 ```
 
 # Usage
-To create and deploy a synth server to run tests, use the following example:
+To create and deploy a synth server to run tests, use the following example (change `<your-site-name>` to your
+own site name you have configured in https://portal.kentik.com/v4/core/quick-views/sites):
 
 ```yaml
 apiVersion: synthetics.kentiklabs.com/v1
@@ -69,8 +70,7 @@ kind: SyntheticTask
 metadata:
   name: myservice-synth
 spec:
-  kentik_company: "<your-company>"
-  kentik_site: "<your-site-id>"
+  kentik_site: "<your-site-name>"
   fetch:
     - service: myservice
       target: /
@@ -119,7 +119,7 @@ info (IP, etc) will be automatically resolved by the operator.
 | `tls` | optional | Enable TLS for the check|
 | `target` | yes | Path (i.e. `/`) for the check|
 | `method` | optional (default: `GET`) | HTTP method to use for check |
-| `period` | optional (default: `10s`) | Interval to perform check |
+| `period` | optional (default: `60s`) | Interval to perform check |
 | `expiry` | optional (default: `5s`) | Timeout for the check to complete|
 | `ignoreTLSErrors` | optional (default: `false`) | Ignore TLS errors on request |
 
@@ -154,6 +154,6 @@ will be automatically resolved by the operator.
 | `count` | optional (default: `3`) | Number of tries for the check|
 | `timeout` | yes (default: `1000`) | Timeout (in ms) for the check|
 | `limit` | optional (default: `3` min: `1` max: `50`) | Maximum number of hops|
-| `period` | optional (default: `10s`) | Interval to perform check |
+| `period` | optional (default: `60s`) | Interval to perform check |
 | `delay` | optional (default: `0ms`) | Delay (in ms) before each check|
 | `expiry` | optional (default: `5s`) | Timeout for the check to complete|

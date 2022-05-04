@@ -208,7 +208,7 @@ type TestHealthSettings struct {
 }
 
 func (c *Client) Tests(ctx context.Context) ([]*Test, error) {
-	resp, err := c.request(ctx, http.MethodGet, "/tests", nil)
+	resp, err := c.request(ctx, syntheticsAPIEndpoint, http.MethodGet, "/tests", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +258,7 @@ func (c *Client) CreateTest(ctx context.Context, t *Test) (*Test, error) {
 	// DEBUG
 	//fmt.Printf("%s\n", string(buf.Bytes()))
 
-	resp, err := c.request(ctx, http.MethodPost, "/tests", buf)
+	resp, err := c.request(ctx, syntheticsAPIEndpoint, http.MethodPost, "/tests", buf)
 	if err != nil {
 		errData, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
@@ -305,7 +305,7 @@ func (c *Client) UpdateTest(ctx context.Context, t *Test, updateFields []string)
 		return err
 	}
 
-	resp, err := c.request(ctx, http.MethodPatch, fmt.Sprintf("/tests/%s", t.ID), buf)
+	resp, err := c.request(ctx, syntheticsAPIEndpoint, http.MethodPatch, fmt.Sprintf("/tests/%s", t.ID), buf)
 	if err != nil {
 		errData, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
@@ -330,7 +330,7 @@ func (c *Client) UpdateTest(ctx context.Context, t *Test, updateFields []string)
 }
 
 func (c *Client) DeleteTest(ctx context.Context, testID string) error {
-	if resp, err := c.request(ctx, http.MethodDelete, fmt.Sprintf("/tests/%s", testID), nil); err != nil {
+	if resp, err := c.request(ctx, syntheticsAPIEndpoint, http.MethodDelete, fmt.Sprintf("/tests/%s", testID), nil); err != nil {
 		errData, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err

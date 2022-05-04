@@ -67,7 +67,7 @@ type Agent struct {
 }
 
 func (c *Client) Agents(ctx context.Context) ([]*Agent, error) {
-	resp, err := c.request(ctx, http.MethodGet, "/agents", nil)
+	resp, err := c.request(ctx, syntheticsAPIEndpoint, http.MethodGet, "/agents", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (c *Client) AuthorizeAgent(ctx context.Context, agentID, agentName, siteID 
 		return err
 	}
 
-	resp, err := c.request(ctx, http.MethodPut, fmt.Sprintf("/agents/%s", agentID), buf)
+	resp, err := c.request(ctx, syntheticsAPIEndpoint, http.MethodPut, fmt.Sprintf("/agents/%s", agentID), buf)
 	if err != nil {
 		errData, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
@@ -131,7 +131,7 @@ func (c *Client) AuthorizeAgent(ctx context.Context, agentID, agentName, siteID 
 }
 
 func (c *Client) DeleteAgent(ctx context.Context, agentID string) error {
-	if resp, err := c.request(ctx, http.MethodDelete, fmt.Sprintf("/agents/%s", agentID), nil); err != nil {
+	if resp, err := c.request(ctx, syntheticsAPIEndpoint, http.MethodDelete, fmt.Sprintf("/agents/%s", agentID), nil); err != nil {
 		errData, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err

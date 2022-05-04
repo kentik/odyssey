@@ -17,10 +17,12 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	syntheticsv1 "github.com/kentik/odyssey/api/v1"
+	"github.com/kentik/odyssey/pkg/synthetics"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -136,7 +138,7 @@ func (s *SyntheticTaskReconciler) getServerService(t *syntheticsv1.SyntheticTask
 	}
 }
 
-func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTask, serverEndpoint string) *appsv1.Deployment {
+func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTask, serverEndpoint string) (*appsv1.Deployment, error) {
 	replicas := int32(1)
 	labels := agentLabels(t.Name)
 	image := t.Spec.AgentImage
@@ -150,6 +152,9 @@ func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTa
 		cmd = append(cmd, "--output", fmt.Sprintf("influx=%s,username=%s,password=%s,token=%s", influxEndpoint, v.Username, v.Password, v.Token))
 	}
 	r.Log.Info("agent deployment", "endpoint", serverEndpoint)
+
+	synthClient := synthetics.NewClient(r.KentikEmail, r.KentikAPIToken, r.Log)
+
 	env := []corev1.EnvVar{
 		{
 			Name:  agentApiHostEnvVar,
@@ -164,18 +169,24 @@ func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTa
 			Value: fmt.Sprintf("%d", time.Now().UnixNano()),
 		},
 	}
-	if v := t.Spec.KentikCompany; v != "" {
-		env = append(env, corev1.EnvVar{
-			Name:  agentKentikCompanyEnvVar,
-			Value: v,
-		})
+
+	site, err := synthClient.GetSite(context.Background(), t.Spec.KentikSite)
+	if err != nil {
+		return nil, err
 	}
-	if v := t.Spec.KentikSite; v != "" {
-		env = append(env, corev1.EnvVar{
-			Name:  agentKentikSiteEnvVar,
-			Value: v,
-		})
-	}
+	r.Log.Info("using kentik company", "id", site.CompanyID)
+
+	env = append(env, corev1.EnvVar{
+		Name:  agentKentikCompanyEnvVar,
+		Value: fmt.Sprintf("%d", site.CompanyID),
+	})
+
+	r.Log.Info("using kentik site", "id", site.ID)
+	env = append(env, corev1.EnvVar{
+		Name:  agentKentikSiteEnvVar,
+		Value: fmt.Sprintf("%d", site.ID),
+	})
+
 	if v := t.Spec.KentikRegion; v != "" {
 		env = append(env, corev1.EnvVar{
 			Name:  agentKentikRegionEnvVar,
@@ -217,7 +228,7 @@ func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTa
 		},
 	}
 
-	return deploy
+	return deploy, nil
 }
 
 func getServerConfigMapName(task *syntheticsv1.SyntheticTask) string {

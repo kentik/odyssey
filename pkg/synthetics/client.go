@@ -26,30 +26,29 @@ import (
 )
 
 const (
-	defaultAPIEndpoint = "https://grpc.api.kentik.com/synthetics/v202202"
-	headerAuthEmail    = "x-ch-auth-email"
-	headerAuthToken    = "x-ch-auth-api-token"
+	syntheticsAPIEndpoint = "https://grpc.api.kentik.com/synthetics/v202202"
+	defaultAPIEndpoint    = "https://api.kentik.com/api/v5"
+	headerAuthEmail       = "x-ch-auth-email"
+	headerAuthToken       = "x-ch-auth-api-token"
 )
 
 type Client struct {
-	endpoint string
-	email    string
-	token    string
-	log      logr.Logger
+	email string
+	token string
+	log   logr.Logger
 }
 
 // NewClient returns a new Sythentics API client
 func NewClient(email, token string, log logr.Logger) *Client {
 	return &Client{
-		endpoint: defaultAPIEndpoint,
-		email:    email,
-		token:    token,
-		log:      log,
+		email: email,
+		token: token,
+		log:   log,
 	}
 }
 
-func (c *Client) request(ctx context.Context, method string, path string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, method, fmt.Sprintf("%s%s", defaultAPIEndpoint, path), body)
+func (c *Client) request(ctx context.Context, endpoint, method, path string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, fmt.Sprintf("%s%s", endpoint, path), body)
 	if err != nil {
 		return nil, err
 	}
