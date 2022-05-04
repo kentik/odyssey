@@ -122,10 +122,14 @@ func (r *KentikReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 
 		if agent.Status != synthetics.AgentStatusOK {
 			log.Info("authorizing agent", "id", agent.ID)
-			// TODO: check if already authorized and skip
+
+			site, err := synthClient.GetSite(ctx, task.Spec.KentikSite)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
 
 			// auth agent id with site
-			if err := synthClient.AuthorizeAgent(ctx, agent.ID, pod.Name, task.Spec.KentikSite); err != nil {
+			if err := synthClient.AuthorizeAgent(ctx, agent.ID, pod.Name, fmt.Sprintf("%d", site.ID)); err != nil {
 				return ctrl.Result{}, err
 			}
 			if pod.Annotations == nil {

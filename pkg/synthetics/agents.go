@@ -124,7 +124,6 @@ func (c *Client) AuthorizeAgent(ctx context.Context, agentID, agentName, siteID 
 
 		return errors.New(string(errData))
 	}
-
 	defer resp.Body.Close()
 
 	return nil

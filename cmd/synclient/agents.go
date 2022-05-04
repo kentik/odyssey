@@ -116,11 +116,6 @@ var agentsAuthorizeCommand = &cli.Command{
 			return fmt.Errorf("site-id must be specified")
 		}
 
-		siteName := clix.String("site-name")
-		if siteName == "" {
-			return fmt.Errorf("site-name must be specified")
-		}
-
 		if err := client.AuthorizeAgent(ctx, id, name, siteID); err != nil {
 			return err
 		}
