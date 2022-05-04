@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.4.1
+    controller-gen.kubebuilder.io/version: (devel)
   creationTimestamp: null
   name: synthetictasks.synthetics.kentiklabs.com
 spec:
@@ -69,7 +69,7 @@ spec:
                       - POST
                       type: string
                     period:
-                      default: 10s
+                      default: 60s
                       description: Period is the interval for which the server to
                         run the check
                       type: string
@@ -121,9 +121,6 @@ spec:
                 - endpoint
                 - organization
                 type: object
-              kentik_company:
-                description: KentikCompany is the company ID to send data to Kentik
-                type: string
               kentik_region:
                 default: US
                 description: KentikRegion is the region to configure for sending data
@@ -135,7 +132,7 @@ spec:
                 - EU
                 type: string
               kentik_site:
-                description: KentikSite is the site ID to send data to Kentik
+                description: KentikSite is the site name to send data to Kentik
                 type: string
               ping:
                 description: Ping is a list of Ping checks
@@ -272,7 +269,7 @@ spec:
                       description: Name is the name of the k8s object to check
                       type: string
                     period:
-                      default: 10s
+                      default: 60s
                       description: Period is the interval for which the server to
                         run the check
                       type: string
