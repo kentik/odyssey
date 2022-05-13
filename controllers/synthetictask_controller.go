@@ -33,7 +33,7 @@ import (
 
 const (
 	defaultSyntheticServerImage         = "docker.io/kentiklabs/synsrv:latest"
-	defaultSyntheticAgentImage          = "docker.io/kentik/ksynth:latest"
+	defaultSyntheticAgentImage          = "docker.io/kentik/ksynth:0b0d5f58e3a62645e3fb09d1cbd8cbe219443c45"
 	ownerKey                            = ".metadata.controller"
 	serverName                          = "synthetics-server"
 	agentName                           = "synthetics-agent"
@@ -43,7 +43,9 @@ const (
 	serverDeploymentContainerName       = "synthetics-server"
 	serverPortName                      = "server"
 	serverPort                          = int32(8080)
+	agentConfigMapName                  = "agent-config.yml"
 	serverConfigMapName                 = "server-config.yml"
+	agentDeploymentConfigVolumeName     = "config"
 	agentDeploymentContainerName        = "synthetics-agent"
 	finalizerName                       = "com.kentiklabs.synthetics/finalizer"
 	agentApiHostEnvVar                  = "KENTIK_API_HOST"
@@ -57,7 +59,7 @@ const (
 )
 
 var (
-	defaultAgentCommand = []string{"/opt/kentik/ksynth/ksynth", "agent", "-vv"}
+	defaultAgentCommand = []string{"/opt/kentik/ksynth/ksynth", "agent", "-vv", "-4"}
 	baseServerConfig    = `
 tasks:
   - ping:
@@ -128,7 +130,7 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	var reconciler Reconciler
 	// default to synsrv
-	reconciler = NewSynSrvReconciler(r)
+	reconciler = NewLocalReconciler(r)
 	// check for Kentik
 	if task.Spec.KentikSite != "" {
 		// check for valid controller config

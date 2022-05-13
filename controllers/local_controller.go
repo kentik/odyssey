@@ -33,72 +33,33 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type SynSrvReconciler struct {
+type LocalReconciler struct {
 	reconciler *SyntheticTaskReconciler
 }
 
-func NewSynSrvReconciler(r *SyntheticTaskReconciler) *SynSrvReconciler {
-	return &SynSrvReconciler{
+func NewLocalReconciler(r *SyntheticTaskReconciler) *LocalReconciler {
+	return &LocalReconciler{
 		reconciler: r,
 	}
 }
 
-func (r *SynSrvReconciler) Reconcile(ctx context.Context, req ctrl.Request, task *syntheticsv1.SyntheticTask) (ctrl.Result, error) {
-	log := r.reconciler.Log.WithValues("name", req.NamespacedName, "namespace", req.Namespace, "controller", "synsrv")
+func (r *LocalReconciler) Reconcile(ctx context.Context, req ctrl.Request, task *syntheticsv1.SyntheticTask) (ctrl.Result, error) {
+	log := r.reconciler.Log.WithValues("name", req.NamespacedName, "namespace", req.Namespace, "controller", "local")
 
-	// server config map
-	currentServerConfigMap := corev1.ConfigMap{}
-	if err := r.reconciler.Get(ctx, types.NamespacedName{Name: getServerConfigMapName(task), Namespace: task.Namespace}, &currentServerConfigMap); err != nil {
+	currentAgentConfigMap := corev1.ConfigMap{}
+	if err := r.reconciler.Get(ctx, types.NamespacedName{Name: getAgentConfigMapName(task), Namespace: task.Namespace}, &currentAgentConfigMap); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
-		log.Info("creating server configmap")
-		configMap := r.reconciler.getServerConfigMap(task, baseServerConfig)
+		log.Info("creating agent configmap")
+		configMap := r.reconciler.getAgentConfigMap(task, baseServerConfig)
 		ctrl.SetControllerReference(task, configMap, r.reconciler.Scheme)
 		if err := r.reconciler.Create(ctx, configMap); err != nil {
-			log.Error(err, "error getting server configmap")
+			log.Error(err, "error getting agent configmap")
 			return ctrl.Result{}, err
 		}
 		// created; requeue and wait
 		return ctrl.Result{Requeue: true}, nil
-	}
-
-	log.Info("checking server deployment", "name", task.Name, "namespace", task.Namespace)
-	// server deployment
-	currentServerDeployment := appsv1.Deployment{}
-	if err := r.reconciler.Get(ctx, types.NamespacedName{Name: getServerDeploymentName(task), Namespace: task.Namespace}, &currentServerDeployment); err != nil {
-		// no deployment found; create
-		if !apierrors.IsNotFound(err) {
-			log.Error(err, "error getting server deployment")
-			return ctrl.Result{}, err
-		}
-
-		deployment := r.reconciler.getServerDeployment(task, &currentServerConfigMap)
-		ctrl.SetControllerReference(task, deployment, r.reconciler.Scheme)
-		if err := r.reconciler.Create(ctx, deployment); err != nil {
-			return ctrl.Result{}, err
-		}
-		// deployed; requeue and wait
-		return ctrl.Result{Requeue: true}, nil
-	}
-
-	// server service
-	currentServerService := corev1.Service{}
-	if err := r.reconciler.Get(ctx, types.NamespacedName{Name: getServerServiceName(task), Namespace: task.Namespace}, &currentServerService); err != nil {
-		// no service found; create
-		if apierrors.IsNotFound(err) {
-			log.Info("creating server service")
-			deployment := r.reconciler.getServerService(task)
-			ctrl.SetControllerReference(task, deployment, r.reconciler.Scheme)
-			if err := r.reconciler.Create(ctx, deployment); err != nil {
-				return ctrl.Result{}, err
-			}
-			// deployed; requeue and wait
-			return ctrl.Result{Requeue: true}, nil
-		}
-
-		log.Error(err, "error getting server deployment")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	log.Info("checking agent deployment", "name", task.Name, "namespace", task.Namespace)
@@ -109,10 +70,9 @@ func (r *SynSrvReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 		if apierrors.IsNotFound(err) {
 			log.Info("creating agent deployment")
 
-			serverEndpoint := fmt.Sprintf("http://%s:%d", currentServerService.Spec.ClusterIP, serverPort)
-			r.reconciler.Log.Info("configuring for local export", "endpoint", serverEndpoint)
+			r.reconciler.Log.Info("configuring for local export", "task", task.Name)
 
-			deployment, err := r.reconciler.getAgentDeployment(task, serverEndpoint)
+			deployment, err := r.reconciler.getAgentDeployment(task, "", &currentAgentConfigMap)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -354,8 +314,8 @@ func (r *SynSrvReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 		task.Status.DeployNeeded = true
 
 		log.Info("config update", "config", configData)
-		currentServerConfigMap.Data[serverConfigMapName] = configData
-		if err := r.reconciler.Update(ctx, &currentServerConfigMap); err != nil {
+		currentAgentConfigMap.Data[agentConfigMapName] = configData
+		if err := r.reconciler.Update(ctx, &currentAgentConfigMap); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -369,7 +329,7 @@ func (r *SynSrvReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 	if task.Status.DeployNeeded {
 		log.Info("deploy needed", "task", task.Name)
 		podList := &corev1.PodList{}
-		if err := r.reconciler.List(ctx, podList, client.InNamespace(task.Namespace), client.MatchingLabels(serverLabels(task.Name))); err != nil {
+		if err := r.reconciler.List(ctx, podList, client.InNamespace(task.Namespace), client.MatchingLabels(agentLabels(task.Name))); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -391,7 +351,7 @@ func (r *SynSrvReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 	return ctrl.Result{}, nil
 }
 
-func (r *SynSrvReconciler) Cleanup(_ context.Context, _ ctrl.Request, _ *syntheticsv1.SyntheticTask) error {
+func (r *LocalReconciler) Cleanup(_ context.Context, _ ctrl.Request, _ *syntheticsv1.SyntheticTask) error {
 	return nil
 }
 
