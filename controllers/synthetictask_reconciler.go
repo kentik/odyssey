@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,19 +30,11 @@ import (
 )
 
 const (
-	defaultSyntheticServerImage         = "docker.io/kentiklabs/synsrv:latest"
-	defaultSyntheticAgentImage          = "docker.io/kentik/ksynth:0b0d5f58e3a62645e3fb09d1cbd8cbe219443c45"
+	defaultSyntheticAgentImage          = "docker.io/kentik/ksynth:1.3.0"
 	ownerKey                            = ".metadata.controller"
-	serverName                          = "synthetics-server"
 	agentName                           = "synthetics-agent"
-	serverLabel                         = "kentiklabs.synthetics.server"
 	agentLabel                          = "kentiklabs.synthetics.agent"
-	serverDeploymentConfigVolumeName    = "config"
-	serverDeploymentContainerName       = "synthetics-server"
-	serverPortName                      = "server"
-	serverPort                          = int32(8080)
 	agentConfigMapName                  = "agent-config.yml"
-	serverConfigMapName                 = "server-config.yml"
 	agentDeploymentConfigVolumeName     = "config"
 	agentDeploymentContainerName        = "synthetics-agent"
 	finalizerName                       = "com.kentiklabs.synthetics/finalizer"
@@ -80,11 +70,8 @@ type updateTask interface {
 	Yaml() (string, error)
 }
 type updateConfig struct {
-	syntheticTask    *syntheticsv1.SyntheticTask
-	serverService    *corev1.Service
-	serverConfigMap  *corev1.ConfigMap
-	serverDeployment *appsv1.Deployment
-	tasks            []updateTask
+	syntheticTask *syntheticsv1.SyntheticTask
+	tasks         []updateTask
 }
 
 // SyntheticTaskReconciler reconciles a SyntheticTask object

@@ -132,92 +132,6 @@ func (r *LocalReconciler) Reconcile(ctx context.Context, req ctrl.Request, task 
 			configData += yml
 		}
 	}
-	// ping
-	for _, ping := range task.Spec.Ping {
-		log.Info("adding ping", "kind", ping.Kind, "name", ping.Name)
-		switch strings.ToLower(ping.Kind) {
-		case "deployment":
-			log.Info("building ping configuration for deployment", "ping", ping.Name)
-			var deploy appsv1.Deployment
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &deploy); err != nil {
-				return ctrl.Result{}, err
-			}
-			podList := &corev1.PodList{}
-			if err := r.reconciler.List(ctx, podList, client.InNamespace(task.Namespace), client.MatchingLabels(deploy.Spec.Selector.MatchLabels)); err != nil {
-				return ctrl.Result{}, err
-			}
-			log.Info("adding ping", "deployment", deploy.Name)
-			existingPods := map[string]struct{}{}
-			for _, pod := range podList.Items {
-				log.Info("adding ping", "pod", pod.Name)
-				if pod.Status.PodIP == "" {
-					// wait on pod ip
-					log.Info("waiting on pod ip", "ping", ping.Name, "pod", pod.Name)
-					return ctrl.Result{Requeue: true}, nil
-				}
-				if _, exists := existingPods[pod.Status.PodIP]; exists {
-					log.Info("skipping existing pod", "pod", pod.Name)
-					continue
-				}
-				ping.Target = pod.Status.PodIP
-				yml, err := ping.Yaml()
-				if err != nil {
-					return ctrl.Result{}, err
-				}
-				configData += yml
-			}
-		case "pod":
-			log.Info("building ping configuration for pod", "ping", ping.Name)
-			var pod corev1.Pod
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &pod); err != nil {
-				return ctrl.Result{}, err
-			}
-			if pod.Status.PodIP == "" {
-				// wait on pod ip
-				log.Info("waiting on pod ip", "ping", ping.Name, "pod", pod.Name)
-				return ctrl.Result{Requeue: true}, nil
-			}
-			log.Info("adding ping", "pod", pod.Name)
-			ping.Target = pod.Status.PodIP
-			yml, err := ping.Yaml()
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			configData += yml
-		case "service":
-			log.Info("building ping configuration for service", "ping", ping.Name)
-			var service corev1.Service
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &service); err != nil {
-				return ctrl.Result{}, err
-			}
-			log.Info("adding ping", "service", service.Name)
-			ping.Target = service.Spec.ClusterIP
-			yml, err := ping.Yaml()
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			configData += yml
-		case "ingress":
-			log.Info("building ping configuration for ingress", "ping", ping.Name)
-			var ingress networkingv1.Ingress
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &ingress); err != nil {
-				return ctrl.Result{}, err
-			}
-			log.Info("adding ping", "ingress", ingress.Name)
-			for _, rule := range ingress.Spec.Rules {
-				log.Info("adding ping rule", "host", rule.Host)
-				ping.Target = rule.Host
-				yml, err := ping.Yaml()
-				if err != nil {
-					return ctrl.Result{}, err
-				}
-				configData += yml
-			}
-		default:
-			return ctrl.Result{}, fmt.Errorf("invalid ping kind %s", ping.Kind)
-		}
-	}
-
 	// trace
 	for _, trace := range task.Spec.Trace {
 		log.Info("adding trace", "kind", trace.Kind, "name", trace.Name)
@@ -246,6 +160,7 @@ func (r *LocalReconciler) Reconcile(ctx context.Context, req ctrl.Request, task 
 					continue
 				}
 				trace.Target = pod.Status.PodIP
+				trace.Protocol = "TCP"
 				yml, err := trace.Yaml()
 				if err != nil {
 					return ctrl.Result{}, err
