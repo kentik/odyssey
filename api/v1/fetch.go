@@ -26,11 +26,12 @@ const (
 	fetchYamlTemplate = `
   - fetch:
       target: {{.Target}}
+      port: {{.Port}}
       method: {{.Method}}
+      insecure: {{.IgnoreTLSErrors}}
       period: {{.Period}}
       expiry: {{.Expiry}}
-    ipv4: true
-    ipv6: false
+    network: ipv4
 `
 )
 

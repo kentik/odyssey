@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"path"
 	"time"
 
 	syntheticsv1 "github.com/kentik/odyssey/api/v1"
@@ -28,117 +29,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *SyntheticTaskReconciler) getServerConfigMap(t *syntheticsv1.SyntheticTask, data string) *corev1.ConfigMap {
+func (r *SyntheticTaskReconciler) getAgentConfigMap(t *syntheticsv1.SyntheticTask, data string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getServerConfigMapName(t),
+			Name:      getAgentConfigMapName(t),
 			Namespace: t.Namespace,
 		},
 		Data: map[string]string{
-			serverConfigMapName: data,
+			agentConfigMapName: data,
 		},
 	}
 }
 
-func (r *SyntheticTaskReconciler) getServerDeployment(t *syntheticsv1.SyntheticTask, configMap *corev1.ConfigMap) *appsv1.Deployment {
-	replicas := int32(1)
-	labels := serverLabels(t.Name)
-	image := t.Spec.ServerImage
-	if image == "" {
-		image = defaultSyntheticServerImage
-	}
-	serverCmd := []string{
-		"synsrv",
-		"-v",
-		"server",
-		"-b",
-		fmt.Sprintf("0.0.0.0:%d", serverPort),
-		"-c",
-		fmt.Sprintf("/etc/kentik/%s", serverConfigMapName),
-	}
-	if len(t.Spec.ServerCommand) > 0 {
-		serverCmd = t.Spec.ServerCommand
-	}
-	serverContainer := corev1.Container{
-		Image:           image,
-		ImagePullPolicy: corev1.PullAlways,
-		Name:            serverDeploymentContainerName,
-		Command:         serverCmd,
-		Ports: []corev1.ContainerPort{
-			{
-				Name:          serverPortName,
-				ContainerPort: serverPort,
-			},
-		},
-	}
-	podSpec := corev1.PodSpec{}
-	if configMap != nil {
-		podSpec.Volumes = []corev1.Volume{
-			{
-				Name: serverDeploymentConfigVolumeName,
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-
-							Name: configMap.Name,
-						},
-					},
-				},
-			},
-		}
-		serverContainer.VolumeMounts = []corev1.VolumeMount{
-			{
-				Name:      serverDeploymentConfigVolumeName,
-				ReadOnly:  true,
-				MountPath: "/etc/kentik",
-			},
-		}
-	}
-	podSpec.Containers = []corev1.Container{serverContainer}
-
-	deploy := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      getServerDeploymentName(t),
-			Namespace: t.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: podSpec,
-			},
-		},
-	}
-
-	return deploy
-}
-
-func (s *SyntheticTaskReconciler) getServerService(t *syntheticsv1.SyntheticTask) *corev1.Service {
-	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      getServerServiceName(t),
-			Namespace: t.Namespace,
-			Labels:    serverLabels(t.Name),
-		},
-		Spec: corev1.ServiceSpec{
-			Selector: serverLabels(t.Name),
-			Ports: []corev1.ServicePort{
-				{
-					Name:     serverPortName,
-					Protocol: corev1.ProtocolTCP,
-					Port:     serverPort,
-				},
-			},
-		},
-	}
-}
-
-func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTask, serverEndpoint string) (*appsv1.Deployment, error) {
+func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTask, serverEndpoint string, configMap *corev1.ConfigMap) (*appsv1.Deployment, error) {
 	replicas := int32(1)
 	labels := agentLabels(t.Name)
 	image := t.Spec.AgentImage
@@ -147,19 +50,13 @@ func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTa
 	}
 	cmd := defaultAgentCommand
 	if v := t.Spec.InfluxDB; v != nil {
-		influxEndpoint := fmt.Sprintf("%s?org=%s&bucket=%s", v.Endpoint, v.Organization, v.Bucket)
+		influxEndpoint := fmt.Sprintf("%s?org=%s&bucket=%s&precision=ns", v.Endpoint, v.Organization, v.Bucket)
 		r.Log.Info("configuring influxdb output", "target", influxEndpoint)
-		cmd = append(cmd, "--output", fmt.Sprintf("influx=%s,username=%s,password=%s,token=%s", influxEndpoint, v.Username, v.Password, v.Token))
+		cmd = append(cmd, "--output", fmt.Sprintf("influx,endpoint=%s,token=%s", influxEndpoint, v.Token))
 	}
 	r.Log.Info("agent deployment", "endpoint", serverEndpoint)
 
-	synthClient := synthetics.NewClient(r.KentikEmail, r.KentikAPIToken, r.Log)
-
 	env := []corev1.EnvVar{
-		{
-			Name:  agentApiHostEnvVar,
-			Value: serverEndpoint,
-		},
 		{
 			Name:  agentKentikAgentUpdateEnvVar,
 			Value: "true",
@@ -170,29 +67,40 @@ func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTa
 		},
 	}
 
-	site, err := synthClient.GetSite(context.Background(), t.Spec.KentikSite)
-	if err != nil {
-		return nil, err
-	}
-	r.Log.Info("using kentik company", "id", site.CompanyID)
+	// kentik specific deploy
+	if t.Spec.KentikSite != "" {
+		synthClient := synthetics.NewClient(r.KentikEmail, r.KentikAPIToken, r.Log)
+		env = append(env,
+			corev1.EnvVar{
+				Name:  agentApiHostEnvVar,
+				Value: serverEndpoint,
+			},
+		)
+		site, err := synthClient.GetSite(context.Background(), t.Spec.KentikSite)
+		if err != nil {
+			return nil, err
+		}
+		r.Log.Info("using kentik company", "id", site.CompanyID)
 
-	env = append(env, corev1.EnvVar{
-		Name:  agentKentikCompanyEnvVar,
-		Value: fmt.Sprintf("%d", site.CompanyID),
-	})
-
-	r.Log.Info("using kentik site", "id", site.ID)
-	env = append(env, corev1.EnvVar{
-		Name:  agentKentikSiteEnvVar,
-		Value: fmt.Sprintf("%d", site.ID),
-	})
-
-	if v := t.Spec.KentikRegion; v != "" {
 		env = append(env, corev1.EnvVar{
-			Name:  agentKentikRegionEnvVar,
-			Value: v,
+			Name:  agentKentikCompanyEnvVar,
+			Value: fmt.Sprintf("%d", site.CompanyID),
 		})
+
+		r.Log.Info("using kentik site", "id", site.ID)
+		env = append(env, corev1.EnvVar{
+			Name:  agentKentikSiteEnvVar,
+			Value: fmt.Sprintf("%d", site.ID),
+		})
+
+		if v := t.Spec.KentikRegion; v != "" {
+			env = append(env, corev1.EnvVar{
+				Name:  agentKentikRegionEnvVar,
+				Value: v,
+			})
+		}
 	}
+
 	agentContainer := corev1.Container{
 		Image:           image,
 		ImagePullPolicy: corev1.PullAlways,
@@ -204,11 +112,42 @@ func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTa
 		agentContainer.Command = t.Spec.AgentCommand
 	}
 
+	volumes := []corev1.Volume{}
+
+	// agent with configmap
+	if configMap != nil {
+		configMountPath := "/etc/kentik"
+		volumes = []corev1.Volume{
+			{
+				Name: agentDeploymentConfigVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+
+							Name: configMap.Name,
+						},
+					},
+				},
+			},
+		}
+		agentContainer.VolumeMounts = []corev1.VolumeMount{
+			{
+				Name:      agentDeploymentConfigVolumeName,
+				ReadOnly:  true,
+				MountPath: configMountPath,
+			},
+		}
+		agentContainer.Command = append(agentContainer.Command, []string{"--config", path.Join(configMountPath, agentConfigMapName)}...)
+		r.Log.Info("updated agent deploy for local config map", "config", configMap.Name, "agentCommand", agentContainer.Command)
+	}
+
 	podSpec := corev1.PodSpec{
 		Containers: []corev1.Container{
 			agentContainer,
 		},
+		Volumes: volumes,
 	}
+
 	deploy := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getAgentDeploymentName(t),
@@ -231,24 +170,12 @@ func (r *SyntheticTaskReconciler) getAgentDeployment(t *syntheticsv1.SyntheticTa
 	return deploy, nil
 }
 
-func getServerConfigMapName(task *syntheticsv1.SyntheticTask) string {
-	return fmt.Sprintf("%s-%s", task.Name, serverName)
-}
-
-func getServerDeploymentName(task *syntheticsv1.SyntheticTask) string {
-	return fmt.Sprintf("%s-%s", task.Name, serverName)
-}
-
-func getServerServiceName(task *syntheticsv1.SyntheticTask) string {
-	return fmt.Sprintf("%s-%s", task.Name, serverName)
+func getAgentConfigMapName(task *syntheticsv1.SyntheticTask) string {
+	return fmt.Sprintf("%s-%s", task.Name, agentName)
 }
 
 func getAgentDeploymentName(task *syntheticsv1.SyntheticTask) string {
 	return fmt.Sprintf("%s-%s", task.Name, agentName)
-}
-
-func serverLabels(name string) map[string]string {
-	return map[string]string{serverLabel: name}
 }
 
 func agentLabels(name string) map[string]string {

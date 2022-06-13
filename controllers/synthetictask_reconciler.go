@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,18 +30,12 @@ import (
 )
 
 const (
-	defaultSyntheticServerImage         = "docker.io/kentiklabs/synsrv:latest"
-	defaultSyntheticAgentImage          = "docker.io/kentik/ksynth:latest"
+	defaultSyntheticAgentImage          = "docker.io/kentik/ksynth:1.3.0"
 	ownerKey                            = ".metadata.controller"
-	serverName                          = "synthetics-server"
 	agentName                           = "synthetics-agent"
-	serverLabel                         = "kentiklabs.synthetics.server"
 	agentLabel                          = "kentiklabs.synthetics.agent"
-	serverDeploymentConfigVolumeName    = "config"
-	serverDeploymentContainerName       = "synthetics-server"
-	serverPortName                      = "server"
-	serverPort                          = int32(8080)
-	serverConfigMapName                 = "server-config.yml"
+	agentConfigMapName                  = "agent-config.yml"
+	agentDeploymentConfigVolumeName     = "config"
 	agentDeploymentContainerName        = "synthetics-agent"
 	finalizerName                       = "com.kentiklabs.synthetics/finalizer"
 	agentApiHostEnvVar                  = "KENTIK_API_HOST"
@@ -57,7 +49,7 @@ const (
 )
 
 var (
-	defaultAgentCommand = []string{"/opt/kentik/ksynth/ksynth", "agent", "-vv"}
+	defaultAgentCommand = []string{"/opt/kentik/ksynth/ksynth", "agent", "-vv", "-4"}
 	baseServerConfig    = `
 tasks:
   - ping:
@@ -78,11 +70,8 @@ type updateTask interface {
 	Yaml() (string, error)
 }
 type updateConfig struct {
-	syntheticTask    *syntheticsv1.SyntheticTask
-	serverService    *corev1.Service
-	serverConfigMap  *corev1.ConfigMap
-	serverDeployment *appsv1.Deployment
-	tasks            []updateTask
+	syntheticTask *syntheticsv1.SyntheticTask
+	tasks         []updateTask
 }
 
 // SyntheticTaskReconciler reconciles a SyntheticTask object
@@ -128,7 +117,7 @@ func (r *SyntheticTaskReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	var reconciler Reconciler
 	// default to synsrv
-	reconciler = NewSynSrvReconciler(r)
+	reconciler = NewLocalReconciler(r)
 	// check for Kentik
 	if task.Spec.KentikSite != "" {
 		// check for valid controller config

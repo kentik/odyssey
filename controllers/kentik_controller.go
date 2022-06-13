@@ -62,7 +62,7 @@ func (r *KentikReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 				tld = "eu"
 			}
 			serverEndpoint := fmt.Sprintf("https://api.kentik.%s", tld)
-			deployment, err := r.reconciler.getAgentDeployment(task, serverEndpoint)
+			deployment, err := r.reconciler.getAgentDeployment(task, serverEndpoint, nil)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -151,14 +151,6 @@ func (r *KentikReconciler) Reconcile(ctx context.Context, req ctrl.Request, task
 		return ctrl.Result{}, err
 	}
 	if fetchTasksCreated {
-		return ctrl.Result{Requeue: true}, nil
-	}
-	// ping
-	pingTasksCreated, err := r.createPingTasks(ctx, req, task, agentPods)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	if pingTasksCreated {
 		return ctrl.Result{Requeue: true}, nil
 	}
 	// trace
@@ -322,148 +314,6 @@ func (r *KentikReconciler) createFetchTasks(ctx context.Context, req ctrl.Reques
 	return created, nil
 }
 
-func (r *KentikReconciler) createPingTasks(ctx context.Context, req ctrl.Request, task *syntheticsv1.SyntheticTask, agentPods []corev1.Pod) (bool, error) {
-	log := r.reconciler.Log.WithValues("name", req.NamespacedName, "namespace", req.Namespace, "controller", "kentik")
-
-	synthClient := synthetics.NewClient(r.kentikEmail, r.kentikAPIToken, r.reconciler.Log)
-
-	tests, err := synthClient.Tests(ctx)
-	if err != nil {
-		return false, err
-	}
-
-	testLookup := map[string]*synthetics.Test{}
-	for _, t := range tests {
-		testLookup[t.Name] = t
-	}
-
-	// get agentIDs
-	agentIDs := []string{}
-	for _, pod := range agentPods {
-		agentID, exists := pod.Annotations[agentPodAnnotationAgentID]
-		if !exists {
-			return false, fmt.Errorf("unable to get agent id from pod annotations for %s", pod.Name)
-		}
-		agentIDs = append(agentIDs, agentID)
-	}
-
-	// ping
-	created := false
-	for _, ping := range task.Spec.Ping {
-		// create test per agent
-		testName := fmt.Sprintf("%s/ping-%s", task.Namespace, ping.Name)
-		if _, exists := testLookup[testName]; exists {
-			// check if agent matches; if not call UpdateTest with agent id
-			log.Info("test exists", "name", testName)
-			continue
-		}
-		created = true
-
-		targetIPs := []string{}
-		switch strings.ToLower(ping.Kind) {
-		case "deployment":
-			// check if exists
-			var deploy appsv1.Deployment
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &deploy); err != nil {
-				return false, err
-			}
-			podList := &corev1.PodList{}
-			if err := r.reconciler.List(ctx, podList, client.InNamespace(task.Namespace), client.MatchingLabels(deploy.Spec.Selector.MatchLabels)); err != nil {
-				return false, err
-			}
-			existingPods := map[string]struct{}{}
-			for _, pod := range podList.Items {
-				log.Info("building ping configuration for deployment", "ping", ping.Name)
-				if pod.Status.PodIP == "" {
-					// wait on pod ip
-					log.Info("waiting on pod ip", "ping", ping.Name, "pod", pod.Name)
-					return true, nil
-				}
-				if _, exists := existingPods[pod.Status.PodIP]; exists {
-					log.Info("skipping existing pod", "pod", pod.Name)
-					continue
-				}
-				targetIPs = append(targetIPs, pod.Status.PodIP)
-				log.Info("added target ip for ping", "deployment", deploy.Name, "pod", pod.Name, "ip", pod.Status.PodIP)
-			}
-		case "pod":
-			log.Info("building ping configuration for pod", "ping", ping.Name)
-			var pod corev1.Pod
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &pod); err != nil {
-				return false, err
-			}
-			if pod.Status.PodIP == "" {
-				// wait on pod ip
-				log.Info("waiting on pod ip", "ping", ping.Name, "pod", pod.Name)
-				return true, err
-			}
-			targetIPs = append(targetIPs, pod.Status.PodIP)
-			log.Info("added target ip for ping", "pod", pod.Name, "ip", pod.Status.PodIP)
-		case "service":
-			log.Info("building ping configuration for service", "ping", ping.Name)
-			var service corev1.Service
-			if err := r.reconciler.Get(ctx, types.NamespacedName{Name: ping.Name, Namespace: req.NamespacedName.Namespace}, &service); err != nil {
-				return false, err
-			}
-			targetIPs = append(targetIPs, service.Spec.ClusterIP)
-			log.Info("added target ip for ping", "service", service.Name, "ip", service.Spec.ClusterIP)
-		default:
-			return false, fmt.Errorf("invalid ping kind %s", ping.Kind)
-		}
-
-		pingPeriod, err := time.ParseDuration(ping.Period)
-		if err != nil {
-			return false, err
-		}
-		pingDelay, err := time.ParseDuration(ping.Delay)
-		if err != nil {
-			return false, err
-		}
-
-		if ping.Count <= 0 {
-			ping.Count = 1
-		}
-
-		test, err := synthClient.CreateTest(ctx, &synthetics.Test{
-			Name: testName,
-			Type: synthetics.TestTypeIP,
-			Settings: &synthetics.TestSettings{
-				Period: int(pingPeriod.Seconds()),
-				Tasks:  []string{synthetics.TestTaskPing},
-				Ping: &synthetics.PingTest{
-					Protocol: ping.Protocol,
-					Port:     ping.Port,
-					Count:    ping.Count,
-					Delay:    int(pingDelay.Milliseconds()),
-					Timeout:  ping.Timeout,
-				},
-				Trace: &synthetics.TraceTest{
-					Protocol: ping.Protocol,
-					Port:     ping.Port,
-					Count:    ping.Count,
-					Delay:    int(pingDelay.Milliseconds()),
-					Limit:    5,
-					Timeout:  ping.Timeout,
-				},
-				IP: &synthetics.TestIP{
-					Targets: targetIPs,
-				},
-				AgentIDs: agentIDs,
-			},
-		})
-		if err != nil {
-			return false, err
-		}
-
-		if err := r.updateTaskTestIDs(ctx, task, test.ID); err != nil {
-			return false, err
-		}
-		log.Info("created ping test", "name", testName, "id", test.ID)
-	}
-
-	return created, nil
-}
-
 func (r *KentikReconciler) createTraceTasks(ctx context.Context, req ctrl.Request, task *syntheticsv1.SyntheticTask, agentPods []corev1.Pod) (bool, error) {
 	log := r.reconciler.Log.WithValues("name", req.NamespacedName, "namespace", req.Namespace, "controller", "kentik")
 
@@ -564,15 +414,7 @@ func (r *KentikReconciler) createTraceTasks(ctx context.Context, req ctrl.Reques
 			Type: synthetics.TestTypeIP,
 			Settings: &synthetics.TestSettings{
 				Tasks: []string{
-					synthetics.TestTaskPing,
 					synthetics.TestTaskTrace,
-				},
-				Ping: &synthetics.PingTest{
-					Protocol: synthetics.TestProtocolTCP,
-					Port:     trace.Port,
-					Count:    trace.Count,
-					Delay:    int(traceDelay.Milliseconds()),
-					Timeout:  trace.Timeout,
 				},
 				Trace: &synthetics.TraceTest{
 					Protocol: synthetics.TestProtocolTCP,

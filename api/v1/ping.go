@@ -32,8 +32,7 @@ const (
       protocol: {{.Protocol}}
       port: {{.Port}}
       expiry: {{.Expiry}}
-    ipv4: true
-    ipv6: false
+    network: ipv4
 `
 )
 
