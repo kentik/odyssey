@@ -49,7 +49,7 @@ const (
 )
 
 var (
-	defaultAgentCommand = []string{"/opt/kentik/ksynth/ksynth", "agent", "-vv", "-4"}
+	defaultAgentCommand = []string{"/opt/kentik/ksynth/ksynth", "agent", "-vv", "-4", "--control", "/ksynth-agent.sock"}
 	baseServerConfig    = `
 tasks:
   - ping:
