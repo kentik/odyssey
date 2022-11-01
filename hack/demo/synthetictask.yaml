@@ -3,8 +3,7 @@ kind: SyntheticTask
 metadata:
   name: demo
 spec:
-  kentik_company: ""
-  kentik_site: ""
+  kentik_site: "CHANGEME"
   fetch:
     - service: demo
       target: /
@@ -21,12 +20,3 @@ spec:
       period: 60s
       expiry: 5s
       timeout: 1000
-  trace:
-    - name: demo
-      kind: service
-      port: 8080
-      limit: 5
-      period: 60s
-      count: 1
-      timeout: 1000
-      expiry: 5s
